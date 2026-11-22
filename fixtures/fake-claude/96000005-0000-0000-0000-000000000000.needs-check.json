@@ -1,0 +1,6 @@
+{
+  "total_cost_usd": 0.005,
+  "result": {"checks": [
+    {"correction": "c1", "found": true, "path": "CLAUDE.md", "quote": "Do not write, run, or keep tests."}
+  ]}
+}

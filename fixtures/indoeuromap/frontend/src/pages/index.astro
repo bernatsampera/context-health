@@ -1,0 +1,11 @@
+---
+import LayoutV2 from '../layouts/LayoutV2.astro';
+import HomePage from '../components/pages/HomePage';
+import { loadHomeCities } from '../lib/aggregates';
+
+const cities = await loadHomeCities();
+---
+
+<LayoutV2 title="Multicultural cities in Europe | IndoEuroMap">
+  <HomePage client:load cities={cities} />
+</LayoutV2>

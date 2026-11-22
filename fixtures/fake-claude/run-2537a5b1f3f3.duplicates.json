@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.0101,
+  "result": {
+    "facts": [
+      { "what": "A fact in a file that is not in the input", "same": true,
+        "places": [
+          { "path": "AGENTS.md", "quote": "Do not write, run, or keep tests.", "value": "no tests" },
+          { "path": "docs/does-not-exist.md", "quote": "Do not write tests.", "value": "no tests" }
+        ] }
+    ]
+  }
+}

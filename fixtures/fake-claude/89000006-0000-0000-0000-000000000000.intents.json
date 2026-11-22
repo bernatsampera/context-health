@@ -1,0 +1,19 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      {
+        "start": 1,
+        "goal": "Draft the launch post",
+        "corrections": [
+          {
+            "message": 2,
+            "text": "A launch post has no price in it",
+            "quote": "No price in a launch post",
+            "cause": "missing-context"
+          }
+        ]
+      }
+    ]
+  }
+}

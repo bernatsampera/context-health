@@ -1,0 +1,5 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [ { "start": 1, "goal": "Update the Madrid city page \u2014 the new groups",
+    "corrections": [ { "message": 2, "text": "City pages must use LayoutV2 \u2013 always", "quote": "No, city pages must use LayoutV2.", "cause": "missing-context" } ] } ] }
+}

@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      {
+        "start": 1,
+        "goal": "Show the top 8 groups on city profiles",
+        "corrections": []
+      }
+    ]
+  }
+}

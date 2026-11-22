@@ -1,0 +1,11 @@
+{
+  "total_cost_usd": 0.006,
+  "result": {
+    "groups": [
+      { "label": "Understand the profile rule", "members": [1] },
+      { "label": "Fix the frontend layout and design", "members": [2, 3] },
+      { "label": "Change a city page", "members": [4, 5, 6] },
+      { "label": "Draft a Show HN post", "members": [7] }
+    ]
+  }
+}

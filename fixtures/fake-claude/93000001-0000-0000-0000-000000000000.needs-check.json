@@ -1,0 +1,9 @@
+{
+  "total_cost_usd": 0.011,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": false, "path": null, "quote": null,
+        "now": { "path": "MEMORY_DIR/decision-edits-ask-first.md", "quote": "Write the file only after the user says yes." } }
+    ]
+  }
+}

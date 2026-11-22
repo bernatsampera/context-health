@@ -1,0 +1,14 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Build the area page",
+        "corrections": [
+          { "message": 2, "text": "The map legend uses the Okabe-Ito colours", "quote": "Use the Okabe-Ito colours for the legend", "cause": "missing-context" },
+          { "message": 3, "text": "No tests in this project", "quote": "Do not write tests here", "cause": "missing-context" },
+          { "message": 4, "text": "A city with a population of 400,000 or more needs two valid zones", "quote": "A city of 400,000 people or more needs two zones", "cause": "missing-context" },
+          { "message": 5, "text": "Parquet exports go to the folder exports/ with the date", "quote": "Put the parquet exports in exports/ with the date", "cause": "missing-context" }
+        ] }
+    ]
+  }
+}

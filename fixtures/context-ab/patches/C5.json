@@ -1,0 +1,9 @@
+{
+  "title": "Fix the broken link in compare.md",
+  "reason": "compare.md links compare-demand.md, which does not exist. An agent that follows the link fails a read.",
+  "edits": [
+    { "file": "second-iteration/decisions/compare.md",
+      "find": "Notes: [comparison demand](compare-demand.md).",
+      "replace": "No notes yet." }
+  ]
+}

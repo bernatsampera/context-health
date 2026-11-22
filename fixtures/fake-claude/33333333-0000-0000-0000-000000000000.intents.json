@@ -1,0 +1,13 @@
+{
+  "total_cost_usd": 0.052,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Fix the phone layout of the neighbourhood page",
+        "corrections": [
+          { "message": 4, "text": "Check the layout file before building", "quote": "Do not build yet. Check the layout file first.", "cause": "agent-error" },
+          { "message": 5, "text": "The user stopped the agent", "quote": "[Request interrupted by user]", "cause": "unclear" }
+        ] },
+      { "start": 6, "goal": "Check the design rules again and apply the writing rules to the new text", "corrections": [] }
+    ]
+  }
+}

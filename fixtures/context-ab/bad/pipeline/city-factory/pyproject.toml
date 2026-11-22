@@ -1,0 +1,14 @@
+[project]
+name = "city-factory"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi[standard]", "mcp", "pyyaml", "shapely>=2.1.2"]
+
+[project.scripts]
+city-factory = "city_factory.cli:main"
+city-factory-mcp = "city_factory.mcp_server:main"
+city-factory-jobs-mcp = "city_factory.mcp_jobs:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

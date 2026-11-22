@@ -1,0 +1,15 @@
+{
+  "total_cost_usd": 0.012,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": false, "path": null, "quote": null,
+        "now": { "path": "MEMORY_DIR/legend-colours.md", "quote": "The map legend uses the Okabe-Ito colours." } },
+      { "correction": "c2", "found": false, "path": null, "quote": null,
+        "now": { "path": "CLAUDE.md", "quote": "Do not write, run, or keep tests." } },
+      { "correction": "c3", "found": false, "path": null, "quote": null,
+        "now": { "path": "pipeline/steps/info/8_sync_frontend.md", "quote": "A city with population of 400,000 or more needs two valid zones." } },
+      { "correction": "c4", "found": false, "path": null, "quote": null,
+        "now": { "path": "MEMORY_DIR/export-folder-note.md", "quote": "Each parquet export goes to the folder exports/, with the date at the start." } }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "total_cost_usd": 0.0444,
+  "result": {
+    "intents": [
+      { "start": 4, "goal": "Build the area page for Madrid",
+        "corrections": [ { "message": 8, "text": "The page broke on phones", "quote": "it is broken on my phone", "cause": "bug" } ] },
+      { "start": 1, "goal": "Plan the area pages",
+        "corrections": [
+          { "message": 2, "text": "Area pages use LayoutV2", "quote": "we use LayoutV2 for all pages", "cause": "missing-context" },
+          { "message": 6, "text": "The user wants a darker map", "quote": "make the map darker", "cause": "changed-mind" }
+        ] },
+      { "start": 4, "goal": "A second intent at the same start", "corrections": [] },
+      { "start": 99, "goal": "An intent after the end",
+        "corrections": [ { "message": 50, "text": "A message that does not exist", "quote": "none", "cause": "missing-context" } ] }
+    ]
+  }
+}

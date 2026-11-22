@@ -1,0 +1,164 @@
+{
+  "total_cost_usd": 0.0204,
+  "result": {
+    "facts": [
+      { "what": "The message count for the ready mark", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The ready mark comes at 100 main messages.", "value": "100 messages" },
+          { "path": "step10/guard-b.md", "quote": "A stop after 100 new messages sends the ready mark.", "value": "100 new messages" }
+        ] },
+      { "what": "The range of the repeat option", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The repeat count is a whole number from 1 to 3.", "value": "1 to 3" },
+          { "path": "step10/guard-b.md", "quote": "Use `--repeat 3` or less.", "value": "3 or less" }
+        ] },
+      { "what": "The recoveries in one turn", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "A turn allows one recovery.", "value": "one recovery" },
+          { "path": "step10/guard-b.md", "quote": "There is at most one recovery in a turn.", "value": "at most one" }
+        ] },
+      { "what": "The first end date that the checker accepts", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The checker rejects an end date before 2090.", "value": "before 2090" },
+          { "path": "step10/guard-b.md", "quote": "The check fails when the end date is before 2090-01-01.", "value": "before 2090-01-01" }
+        ] },
+      { "what": "When an agent can commit", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "An agent makes no commit unless asked.", "value": "only when asked" },
+          { "path": "step10/guard-b.md", "quote": "Commit only when the driver tells you to.", "value": "only when told" }
+        ] },
+      { "what": "The tool has no dependencies", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The tool has no dependencies.", "value": "no dependencies" },
+          { "path": "step10/guard-b.md", "quote": "Do not add npm dependencies to the tool.", "value": "no npm dependencies" }
+        ] },
+      { "what": "No long dashes in a text", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Write with no em dashes.", "value": "no em dashes" },
+          { "path": "step10/guard-b.md", "quote": "Do not use long dashes in a text.", "value": "no long dashes" }
+        ] },
+      { "what": "The default of the index mode", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "`\"index\": \"code\"` is the default, and `\"claude\"` is the off switch.", "value": "code default, claude off switch" },
+          { "path": "step10/guard-b.md", "quote": "`\"index\": \"claude\"` in the settings file switches back.", "value": "code default, claude switches back" }
+        ] },
+      { "what": "The address of the home server", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The home server has the address `casa.example.org`.", "value": "casa.example.org" },
+          { "path": "step10/guard-b.md", "quote": "The tunnel sends `https://casa.example.org` to `127.0.0.1:4321`.", "value": "casa.example.org to 4321" }
+        ] },
+      { "what": "The scope of the plugin install", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Install the plugin with `--scope local`.", "value": "scope local" },
+          { "path": "step10/guard-b.md", "quote": "The plugin is installed in each project folder with `--scope local`.", "value": "each project, scope local" },
+          { "path": "step10/guard-c.md", "quote": "The plugin is installed per project with `--scope local`, never for the user.", "value": "per project, scope local" }
+        ] },
+      { "what": "Where the remove command deletes a folder", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The remove command deletes a folder only when it is under `EXAMPLE_BOOKS_DIR`.", "value": "only under books dir" },
+          { "path": "step10/guard-b.md", "quote": "The remove command deletes a folder when it is under `~/example-books`.", "value": "only under ~/example-books" }
+        ] },
+      { "what": "A second run replaces the first", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "A second run for the same commit replaces the first run.", "value": "replaces the first run" },
+          { "path": "step10/guard-b.md", "quote": "A second run for the same commit folder replaces the earlier run.", "value": "replaces the earlier run" }
+        ] },
+      { "what": "The capture switch is off by default", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The capture switch is off by default.", "value": "off by default" },
+          { "path": "step10/guard-b.md", "quote": "With the capture switch off (the default), the tool sends nothing.", "value": "off is the default" }
+        ] },
+      { "what": "The line limit of the journal", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Keep the journal under 60 lines.", "value": "60 lines" },
+          { "path": "step10/guard-b.md", "quote": "The journal has at most 80 lines.", "value": "80 lines" }
+        ] },
+      { "what": "The Node version of the toolchain", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The toolchain is Node `24.22.1` (`.nvmrc`).", "value": "Node 24.22.1" },
+          { "path": "step10/guard-b.md", "quote": "Use Node from `.nvmrc` (`24.21.0`) in each shell.", "value": "Node 24.21.0" }
+        ] },
+      { "what": "The default of the capture mode", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The default of `mode` stays `\"steps\"`, and the old projects stay on `\"two-calls\"`.", "value": "default steps" },
+          { "path": "step10/guard-b.md", "quote": "The code default of the mode is `two-calls` (one project ran steps and failed).", "value": "default two-calls" }
+        ] },
+      { "what": "The public variables of the dev file", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The dev file holds `API_URL`, `PROJECT_ID`, `MODEL_ID`, `LOG_HOST` and `LOG_KEY`.", "value": "five variables" },
+          { "path": "step10/guard-b.md", "quote": "Public variables: `API_URL`, `PROJECT_ID`, `MODEL_ID`, `LOG_HOST`, `LOG_KEY`, `TRIGGER_TOKENS`.", "value": "six variables" }
+        ] },
+      { "what": "How long a token is valid", "same": true,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "A token is valid for 30 days.", "value": "30 days" },
+          { "path": "step10/guard-b.md", "quote": "A token is valid for about 4 weeks.", "value": "4 weeks" }
+        ] },
+      { "what": "The count of the settings", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The settings file holds five settings.", "value": "five settings" },
+          { "path": "step10/guard-b.md", "quote": "The settings file has 5 settings in one block.", "value": "5 settings" }
+        ] },
+      { "what": "The groups that a page shows", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The index page lists the top 8 groups.", "value": "top 8" },
+          { "path": "step10/guard-b.md", "quote": "A profile page shows the top 8 groups of a city.", "value": "top 8" },
+          { "path": "step10/guard-c.md", "quote": "The share page shows the top 10 groups.", "value": "top 10" }
+        ] },
+      { "what": "The tries of a download", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "A download gets 1 to 3 tries.", "value": "1 to 3 tries" },
+          { "path": "step10/guard-c.md", "quote": "The tool tries a download 1-3 times.", "value": "1-3 tries" }
+        ] },
+      { "what": "The Node line of the server", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "The server runs on Node 24.", "value": "Node 24" },
+          { "path": "step10/guard-c.md", "quote": "The server image has Node 24.22.1.", "value": "Node 24.22.1" }
+        ] },
+      { "what": "The wait between two tries", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Wait 1 second between two tries.", "value": "1 second" },
+          { "path": "step10/guard-c.md", "quote": "Wait 1.5 seconds between two tries.", "value": "1.5 seconds" }
+        ] },
+      { "what": "Which run the report keeps", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "The report keeps the 1st run.", "value": "the 1st run" },
+          { "path": "step10/guard-c.md", "quote": "The report keeps the 2nd run.", "value": "the 2nd run" }
+        ] },
+      { "what": "What the agent says before a deploy", "same": false,
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Say \"ask the owner before you run the deploy script\" first.", "value": "ask the owner first" },
+          { "path": "step10/guard-b.md", "quote": "Say \"tell the owner before you run the deploy script\" first.", "value": "tell the owner first" }
+        ] },
+      { "what": "The time limit of a call", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "A call stops after 60s.", "value": "60s" },
+          { "path": "step10/guard-c.md", "quote": "A call stops after 60 seconds.", "value": "60 seconds" }
+        ] },
+      { "what": "The row limit of an export", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "An export holds 10,000 rows at most.", "value": "10,000 rows" },
+          { "path": "step10/guard-c.md", "quote": "An export holds up to 10000 rows.", "value": "10000 rows" }
+        ] },
+      { "what": "The address of the status page", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "The status page is at `status.example.org`.", "value": "status.example.org" },
+          { "path": "step10/guard-c.md", "quote": "Open `https://status.example.org:8443` for the status page.", "value": "https://status.example.org:8443" }
+        ] },
+      { "what": "The file with the release notes", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "The release notes are in `notes.md`.", "value": "notes.md" },
+          { "path": "step10/guard-c.md", "quote": "Write each release in `docs/notes.md`.", "value": "docs/notes.md" }
+        ] },
+      { "what": "The groups of a short list", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "A short list holds the top-8 groups.", "value": "top-8 groups" },
+          { "path": "step10/guard-c.md", "quote": "A short list has the top 8 groups only.", "value": "top 8 groups" }
+        ] },
+      { "what": "The mode of the night runs", "same": false,
+        "places": [
+          { "path": "step10/guard-b.md", "quote": "A night run sets `mode=fast`.", "value": "fast" },
+          { "path": "step10/guard-c.md", "quote": "The night runs use `mode=full`.", "value": "full" }
+        ] }
+    ]
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "total_cost_usd": 0.0398,
+  "result": {
+    "facts": [
+      {
+        "what": "The line limit of status.md",
+        "same": true,
+        "places": [
+          {
+            "path": "AGENTS.md",
+            "quote": "Then replace `second-iteration/status.md` (60 lines maximum).",
+            "value": "60 lines"
+          },
+          {
+            "path": "second-iteration/direction.md",
+            "quote": "60 lines maximum. Replace it, do not append.",
+            "value": "60 lines"
+          },
+          {
+            "path": "second-iteration/status.md",
+            "quote": "Keep it under 60 lines.",
+            "value": "60 lines"
+          }
+        ]
+      },
+      {
+        "what": "Show the city batch before run_batch",
+        "same": true,
+        "places": [
+          {
+            "path": "AGENTS.md",
+            "quote": "Present the exact city batch before `run_batch`. It submits at once.",
+            "value": "show the batch first"
+          },
+          {
+            "path": ".claude/skills/city-batch/SKILL.md",
+            "quote": "Show the list to the owner before `run_batch`.",
+            "value": "show the batch first"
+          }
+        ]
+      },
+      {
+        "what": "No tests in this project",
+        "same": true,
+        "places": [
+          {
+            "path": "CLAUDE.md",
+            "quote": "Do not write, run, or keep tests.",
+            "value": "no tests"
+          },
+          {
+            "path": "AGENTS.md",
+            "quote": "Do not write, run, or keep tests.",
+            "value": "no tests"
+          }
+        ]
+      },
+      {
+        "what": "Prove work with a real run",
+        "same": true,
+        "places": [
+          {
+            "path": "CLAUDE.md",
+            "quote": "Prove work with a real run on the data.",
+            "value": "a real run"
+          },
+          {
+            "path": "AGENTS.md",
+            "quote": "Prove work with a real run on the data.",
+            "value": "a real run"
+          },
+          {
+            "path": "pipeline/README.md",
+            "quote": "Prove work with a real run on the data:",
+            "value": "a real run"
+          }
+        ]
+      },
+      {
+        "what": "A failed work_status blocks a run_batch retry",
+        "same": true,
+        "places": [
+          {
+            "path": "pipeline/city-factory/README.md",
+            "quote": "A city with `work_status=failed` blocks `run_batch` retry even when all steps are valid.",
+            "value": "blocks the retry"
+          },
+          {
+            "path": "second-iteration/decisions/pipeline-and-coverage.md",
+            "quote": "A failed `work_status` blocks a `run_batch` retry.",
+            "value": "blocks the retry"
+          }
+        ]
+      }
+    ]
+  }
+}

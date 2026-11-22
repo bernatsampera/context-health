@@ -1,0 +1,10 @@
+{
+  "total_cost_usd": 0.011,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": true, "path": "tests/facts.md", "quote": "The batch size is 40 cities for each run.", "now": null },
+      { "correction": "c2", "found": false, "path": null, "quote": null,
+        "now": { "path": "tests/notes.md", "quote": "The review window is 9 days." } }
+    ]
+  }
+}

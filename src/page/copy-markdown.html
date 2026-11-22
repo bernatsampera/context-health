@@ -1,0 +1,111 @@
+<!-- copy-markdown: start -->
+<style>
+  #copy-md-btn {
+    position: fixed; top: 12px; left: 12px; z-index: 1000;
+    font: 500 13px/1 system-ui, -apple-system, sans-serif;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(127,127,127,.35);
+    background: rgba(255,255,255,.92); color: #1f2328;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  }
+  #copy-md-btn:hover { background: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) #copy-md-btn { background: rgba(30,32,36,.92); color: #e6e6e6; }
+  }
+  :root[data-theme="dark"] #copy-md-btn { background: rgba(30,32,36,.92); color: #e6e6e6; }
+  html { padding-top: 40px; }
+  @media print { #copy-md-btn { display: none; } html { padding-top: 0; } }
+</style>
+<button id="copy-md-btn" type="button" aria-label="Copy this page as Markdown">Copy markdown</button>
+<script>
+(function () {
+  var btn = document.getElementById('copy-md-btn');
+  var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, SVG: 1, BUTTON: 1, TEMPLATE: 1, svg: 1 };
+  function clean(s) { return s.replace(/\s+/g, ' '); }
+  function inline(node) {
+    var out = '';
+    node.childNodes.forEach(function (c) {
+      if (c.nodeType === 3) { out += clean(c.nodeValue); return; }
+      if (c.nodeType !== 1 || SKIP[c.tagName] || c.id === 'copy-md-btn') return;
+      var t = c.tagName, inner = inline(c);
+      if (t === 'STRONG' || t === 'B') out += inner.trim() ? '**' + inner.trim() + '** ' : '';
+      else if (t === 'EM' || t === 'I') out += inner.trim() ? '*' + inner.trim() + '* ' : '';
+      else if (t === 'CODE') out += '`' + c.textContent + '`';
+      else if (t === 'A') out += c.getAttribute('href') && !/^#/.test(c.getAttribute('href')) ? '[' + inner.trim() + '](' + c.href + ')' : inner;
+      else if (t === 'BR') out += '\n';
+      else if (/^(P|DIV|UL|OL|TABLE|PRE|H[1-6]|SECTION|ARTICLE|DETAILS|BLOCKQUOTE)$/.test(t)) out += ' ' + inner + ' ';
+      else if (t === 'SPAN' || t === 'SMALL' || t === 'MARK' || t === 'SUB' || t === 'SUP' || t === 'ABBR' || t === 'TIME' || t === 'LABEL') out += inner + ' ';
+      else out += ' ' + inner + ' ';
+    });
+    return out;
+  }
+  function cell(td) { return inline(td).replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim(); }
+  function table(t) {
+    var rows = Array.prototype.slice.call(t.rows);
+    if (!rows.length) return '';
+    var lines = rows.map(function (r) { return '| ' + Array.prototype.map.call(r.cells, cell).join(' | ') + ' |'; });
+    var n = rows[0].cells.length;
+    lines.splice(1, 0, '|' + new Array(n + 1).join(' --- |'));
+    return lines.join('\n') + '\n\n';
+  }
+  function list(l, depth) {
+    var out = '', i = 1;
+    Array.prototype.forEach.call(l.children, function (li) {
+      if (li.tagName !== 'LI') return;
+      var marker = l.tagName === 'OL' ? (i++) + '. ' : '- ';
+      var text = '', nested = '';
+      li.childNodes.forEach(function (c) {
+        if (c.nodeType === 1 && (c.tagName === 'UL' || c.tagName === 'OL')) nested += list(c, depth + 1);
+        else if (c.nodeType === 1 && c.tagName === 'TABLE') nested += '\n' + table(c);
+        else if (c.nodeType === 3) text += clean(c.nodeValue);
+        else if (c.nodeType === 1 && !SKIP[c.tagName]) text += inline({ childNodes: [c] });
+      });
+      out += new Array(depth + 1).join('  ') + marker + text.replace(/\s+/g, ' ').trim() + '\n' + nested;
+    });
+    return depth ? out : out + '\n';
+  }
+  function block(node) {
+    var out = '';
+    node.childNodes.forEach(function (c) {
+      if (c.nodeType === 3) { var s = clean(c.nodeValue).trim(); if (s) out += s + '\n\n'; return; }
+      if (c.nodeType !== 1 || SKIP[c.tagName] || c.id === 'copy-md-btn' || c.getAttribute('aria-hidden') === 'true') return;
+      var t = c.tagName;
+      var h = /^H([1-6])$/.exec(t);
+      if (h) out += new Array(+h[1] + 1).join('#') + ' ' + inline(c).replace(/\s+/g, ' ').trim() + '\n\n';
+      else if (t === 'P' || t === 'FIGCAPTION' || t === 'SUMMARY' || t === 'DT' || t === 'DD') { var s = inline(c).replace(/[ \t]+/g, ' ').trim(); if (s) out += (t === 'SUMMARY' ? '**' + s + '**' : s) + '\n\n'; }
+      else if (t === 'UL' || t === 'OL') out += list(c, 0);
+      else if (t === 'TABLE') out += table(c);
+      else if (t === 'PRE') out += '```\n' + c.textContent.replace(/\n+$/, '') + '\n```\n\n';
+      else if (t === 'BLOCKQUOTE') out += block(c).trim().split('\n').map(function (l) { return '> ' + l; }).join('\n') + '\n\n';
+      else if (t === 'HR') out += '---\n\n';
+      else if (t === 'IMG') { if (c.alt) out += '![' + c.alt + '](' + c.src + ')\n\n'; }
+      else {
+        var hasBlock = c.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,table,pre,section,article,details,blockquote,dl,header,footer,main,nav');
+        if (hasBlock) out += block(c);
+        else { var s2 = inline(c).replace(/[ \t]+/g, ' ').trim(); if (s2) out += s2 + '\n\n'; }
+      }
+    });
+    return out;
+  }
+  function toMarkdown() {
+    var md = block(document.body).replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    var title = document.title && !document.querySelector('h1') ? '# ' + document.title + '\n\n' : '';
+    return title + md;
+  }
+  function fallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); return ok;
+  }
+  function flash(label) { btn.textContent = label; setTimeout(function () { btn.textContent = 'Copy markdown'; }, 1600); }
+  btn.addEventListener('click', function () {
+    var md = toMarkdown();
+    var done = function () { flash('Copied'); };
+    var fail = function () { flash(fallback(md) ? 'Copied' : 'Copy failed'); };
+    try { navigator.clipboard.writeText(md).then(done, fail); } catch (e) { fail(); }
+  });
+})();
+</script>
+<!-- copy-markdown: end -->

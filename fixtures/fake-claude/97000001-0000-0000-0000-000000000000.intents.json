@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.02,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Fix the <img src=x onerror=alert(1)> tag & the \"quote\" on the home page",
+        "corrections": [
+          { "message": 2, "text": "Home page text is <b>plain</b>, no HTML", "quote": "</details><script>alert(2)</script> no HTML", "cause": "missing-context" }
+        ] },
+      { "start": 3, "goal": "Say thanks", "corrections": [] }
+    ]
+  }
+}

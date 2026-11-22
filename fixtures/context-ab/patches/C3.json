@@ -1,0 +1,9 @@
+{
+  "title": "AGENTS.md says where the current profile rule is",
+  "reason": "In bad, no file links second-iteration/direction.md, so the agent cannot find the current profile rule. The user must give the path. AGENTS.md now names the file in the step for profiles.",
+  "edits": [
+    { "file": "AGENTS.md",
+      "find": "4. For numbers, profiles, or the map, read [pipeline/METHOD.md](pipeline/METHOD.md).",
+      "replace": "4. For the current profile rule, read [second-iteration/direction.md](second-iteration/direction.md). For numbers or the map, read [pipeline/METHOD.md](pipeline/METHOD.md)." }
+  ]
+}

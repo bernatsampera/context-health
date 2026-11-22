@@ -1,0 +1,22 @@
+{
+  "total_cost_usd": 0.02,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Change the city page rule",
+        "corrections": [
+          { "message": 2, "text": "Groups below 3 people are hidden", "quote": "groups below 3 people are hidden", "cause": "missing-context" }
+        ] },
+      { "start": 3, "goal": "Fix the link to the old plan",
+        "corrections": [
+          { "message": 4, "text": "The user wants a red button", "quote": "make the button red", "cause": "changed-mind" },
+          { "message": 5, "text": "No tests in this project", "quote": "never write tests here", "cause": "missing-context" }
+        ] },
+      { "start": 6, "goal": "Know the time zone of the server", "corrections": [] },
+      { "start": 7, "goal": "Add the compare page",
+        "corrections": [
+          { "message": 8, "text": "Compare pages show two cities side by side", "quote": "two cities side by side", "cause": "missing-context" },
+          { "message": 9, "text": "Write the compare numbers with one decimal", "quote": "one decimal", "cause": "missing-context" }
+        ] }
+    ]
+  }
+}

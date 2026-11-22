@@ -1,0 +1,11 @@
+# Pipeline navigation
+
+- [METHOD.md](METHOD.md): How headline numbers, profile rules, name classification, and known limits work.
+- [README.md](README.md): Pipeline stages, output files, settings, and checks.
+- [city-factory/llms.txt](city-factory/llms.txt): Factory operation and backend source navigation.
+- [cli.py](cli.py): Local planning, profile generation, and status commands.
+- [steps/info/README.md](steps/info/README.md): Detailed descriptions of extraction steps.
+- [artifacts.py](artifacts.py): Canonical output paths, private name scores, and legacy file readers.
+- [steps/run_city.py](steps/run_city.py): City step execution.
+
+Archived on 2026-10-18 in `first-iteration/pipeline/`: evaluation, research, show walkthroughs, tests, the artifact migration tool, the unified status script, and the factory admin UI.

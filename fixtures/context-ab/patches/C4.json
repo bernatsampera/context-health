@@ -1,0 +1,15 @@
+{
+  "title": "Remove the 3 duplicate facts (D1, D2, D3)",
+  "reason": "One fact in two files drifts. D2 already drifted (60 and 80 lines), and D3 gives an old profile rule. Keep one source and replace each copy with a link to it.",
+  "edits": [
+    { "file": "pipeline/city-factory/README.md",
+      "find": "Present the exact city batch before `run_batch`. It submits at once.\n",
+      "replace": "The rule for batches is in [AGENTS.md](../../AGENTS.md), section Pipeline operation.\n" },
+    { "file": "second-iteration/plan.md",
+      "find": " Keep it under 80 lines.",
+      "replace": "" },
+    { "file": "pipeline/METHOD.md",
+      "find": "- A city profile shows the top 10 origin groups.\n- A group with fewer than 5 people is hidden.\n",
+      "replace": "- The group rule of a city profile is in [second-iteration/direction.md](../second-iteration/direction.md).\n" }
+  ]
+}

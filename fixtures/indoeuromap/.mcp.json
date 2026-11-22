@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "diversity-map-data": {
+      "command": "uv",
+      "args": ["run", "--project", "pipeline/city-factory", "city-factory-mcp"]
+    },
+    "diversity-map-jobs": {
+      "command": "uv",
+      "args": ["run", "--project", "pipeline/city-factory", "city-factory-jobs-mcp"]
+    }
+  }
+}

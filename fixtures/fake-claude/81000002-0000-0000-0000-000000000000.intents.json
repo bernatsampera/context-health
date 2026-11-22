@@ -1,0 +1,10 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [
+    { "start": 1, "goal": "Set the batch size for the next run",
+      "corrections": [
+        { "message": 2, "text": "The batch size is 40 cities for each run", "quote": "The batch size is 40 cities for each run.", "cause": "missing-context" },
+        { "message": 3, "text": "The review window is 9 days", "quote": "the review window is 9 days", "cause": "missing-context" }
+      ] }
+  ] }
+}

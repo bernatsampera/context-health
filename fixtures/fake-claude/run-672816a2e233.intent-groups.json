@@ -1,0 +1,4 @@
+{
+  "result": "{\"groups\": [{\"label\": \"Read the notes and the test notes\", \"members\": [1, 3]}, {\"label\": \"Fix the prompt template\", \"members\": [2]}, {\"label\": \"Set the batch size\", \"members\": [4]}]}",
+  "total_cost_usd": 0.004
+}

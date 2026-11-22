@@ -1,0 +1,8 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [
+    { "start": 1, "goal": "Run the city batch", "corrections": [
+      { "message": 2, "text": "Use uv run for Python", "quote": "we always use uv run", "cause": "missing-context" }
+    ] }
+  ] }
+}

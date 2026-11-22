@@ -1,0 +1,8 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [
+    { "start": 1, "goal": "Check the notes and the test notes", "corrections": [] },
+    { "start": 2, "goal": "Fix the prompt template", "corrections": [] },
+    { "start": 3, "goal": "Read the test notes again", "corrections": [] }
+  ] }
+}

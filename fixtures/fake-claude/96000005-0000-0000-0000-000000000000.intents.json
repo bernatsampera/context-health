@@ -1,0 +1,13 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Fix the typo in the readme", "corrections": [] },
+      { "start": 3, "goal": "Add a test for the city page",
+        "corrections": [
+          { "message": 4, "text": "No tests in this project", "quote": "never tests here", "cause": "missing-context" }
+        ] },
+      { "start": 5, "goal": "Check the agents file", "corrections": [] }
+    ]
+  }
+}

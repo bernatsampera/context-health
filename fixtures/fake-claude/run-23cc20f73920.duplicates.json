@@ -1,0 +1,51 @@
+{
+  "total_cost_usd": 0.0412,
+  "result": {
+    "facts": [
+      { "what": "The line limit of status.md", "same": false,
+        "places": [
+          { "path": "AGENTS.md", "quote": "Then replace `second-iteration/status.md` (60 lines maximum).", "value": "60 lines" },
+          { "path": "second-iteration/direction.md", "quote": "60 lines maximum. Replace it, do not append.", "value": "60 lines" },
+          { "path": "second-iteration/status.md", "quote": "Keep it under 60 lines.", "value": "60 lines" },
+          { "path": "second-iteration/plan.md", "quote": "Keep it under 80 lines.", "value": "80 lines" }
+        ] },
+      { "what": "How many origin groups a city profile shows", "same": false,
+        "places": [
+          { "path": "second-iteration/direction.md", "quote": "A city profile shows the top 8 origin groups.", "value": "top 8" },
+          { "path": "pipeline/METHOD.md", "quote": "A city profile shows the top 10 origin groups.", "value": "top 10" }
+        ] },
+      { "what": "The smallest group a city profile shows", "same": false,
+        "places": [
+          { "path": "second-iteration/direction.md", "quote": "A group with fewer than 3 people is hidden.", "value": "fewer than 3 hidden" },
+          { "path": "pipeline/METHOD.md", "quote": "A group with fewer than 5 people is hidden.", "value": "fewer than 5 hidden" }
+        ] },
+      { "what": "The records a profile needs", "same": true,
+        "places": [
+          { "path": "second-iteration/direction.md", "quote": "A profile needs 200 classified records.", "value": "200 records" },
+          { "path": "pipeline/METHOD.md", "quote": "A profile needs 200 classified records.", "value": "200 records" }
+        ] },
+      { "what": "Show the city batch before run_batch", "same": true,
+        "places": [
+          { "path": "AGENTS.md", "quote": "Present the exact city batch before `run_batch`. It submits at once.", "value": "show the batch first" },
+          { "path": "pipeline/city-factory/README.md", "quote": "Present the exact city batch before `run_batch`. It submits at once.", "value": "show the batch first" },
+          { "path": ".claude/skills/city-batch/SKILL.md", "quote": "Show the list to the owner before `run_batch`.", "value": "show the batch first" }
+        ] },
+      { "what": "No tests in this project", "same": true,
+        "places": [
+          { "path": "CLAUDE.md", "quote": "Do not write, run, or keep tests.", "value": "no tests" },
+          { "path": "AGENTS.md", "quote": "Do not write, run, or keep tests.", "value": "no tests" }
+        ] },
+      { "what": "Prove work with a real run", "same": true,
+        "places": [
+          { "path": "CLAUDE.md", "quote": "Prove work with a real run on the data.", "value": "a real run" },
+          { "path": "AGENTS.md", "quote": "Prove work with a real run on the data.", "value": "a real run" },
+          { "path": "pipeline/README.md", "quote": "Prove work with a real run on the data:", "value": "a real run" }
+        ] },
+      { "what": "A failed work_status blocks a run_batch retry", "same": true,
+        "places": [
+          { "path": "pipeline/city-factory/README.md", "quote": "A city with `work_status=failed` blocks `run_batch` retry even when all steps are valid.", "value": "blocks the retry" },
+          { "path": "second-iteration/decisions/pipeline-and-coverage.md", "quote": "A failed `work_status` blocks a `run_batch` retry.", "value": "blocks the retry" }
+        ] }
+    ]
+  }
+}

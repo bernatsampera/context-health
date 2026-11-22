@@ -1,0 +1,11 @@
+{
+  "total_cost_usd": 0.003,
+  "result": {
+    "groups": [
+      { "label": "Understand the profile rule", "members": [1] },
+      { "label": "Fix the frontend layout and design", "members": [2, 3] },
+      { "label": "Fix the <img src=x onerror=alert(1)> home page", "members": [4] },
+      { "label": "Say thanks \u2014 quick reply", "members": [5] }
+    ]
+  }
+}

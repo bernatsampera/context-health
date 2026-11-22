@@ -1,0 +1,7 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [
+    { "start": 1, "goal": "Rename the button", "corrections": [] },
+    { "start": 2, "goal": "Know the time zone of the server", "corrections": [] }
+  ] }
+}

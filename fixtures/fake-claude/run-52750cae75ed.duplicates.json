@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.0102,
+  "result": {
+    "facts": [
+      { "what": "The line limit of the journal", "same": "false",
+        "places": [
+          { "path": "step10/guard-a.md", "quote": "Keep the journal under 60 lines.", "value": "60 lines" },
+          { "path": "step10/guard-b.md", "quote": "The journal has at most 80 lines.", "value": "80 lines" }
+        ] }
+    ]
+  }
+}

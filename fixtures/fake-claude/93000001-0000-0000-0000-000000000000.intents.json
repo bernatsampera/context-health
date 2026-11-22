@@ -1,0 +1,11 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Change the city decision to the top 5 groups",
+        "corrections": [
+          { "message": 2, "text": "Show each change of a decision file to the user first, and write it only after the user says yes", "quote": "Show me each change of a decision file first", "cause": "missing-context" }
+        ] }
+    ]
+  }
+}

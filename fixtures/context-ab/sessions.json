@@ -1,0 +1,96 @@
+{
+  "_about": "The recorded sessions of the A/B demo. make-sessions.mjs turns each one into a Claude Code session file in claude-home/projects/. Each read records the text of the file in bad/ at the time of writing, as a real session would. Each session is one intent. No session has a search or a user correction, so only the context changes between runs.",
+  "sessions": [
+    {
+      "id": "99000001-0000-0000-0000-000000000000",
+      "hotSpot": "profile rule",
+      "start": "2026-11-10T09:00:00.000Z",
+      "goal": "Show the top 8 groups on city profiles",
+      "items": [
+        { "user": "City profiles must show the top 8 origin groups. The current rule is in second-iteration/direction.md." },
+        { "read": "AGENTS.md" },
+        { "read": "pipeline/METHOD.md" },
+        { "read": "second-iteration/direction.md" },
+        { "agent": "METHOD.md still says top 10. direction.md says top 8. I use top 8." },
+        { "user": "Good. Change the profile command to top 8." },
+        { "agent": "Done." }
+      ]
+    },
+    {
+      "id": "99000002-0000-0000-0000-000000000000",
+      "hotSpot": "profile rule",
+      "start": "2026-11-11T09:00:00.000Z",
+      "goal": "Find why Lyon shows 10 groups",
+      "items": [
+        { "user": "Why does the Lyon profile show 10 groups? Check second-iteration/direction.md for the rule." },
+        { "read": "AGENTS.md" },
+        { "read": "second-iteration/direction.md" },
+        { "read": "pipeline/METHOD.md" },
+        { "agent": "The export used the old rule from METHOD.md." },
+        { "user": "Re-export Lyon with the current rule." },
+        { "agent": "Done." }
+      ]
+    },
+    {
+      "id": "99000003-0000-0000-0000-000000000000",
+      "hotSpot": "profile rule",
+      "start": "2026-11-12T09:00:00.000Z",
+      "goal": "Write the group rule on the methodology page",
+      "items": [
+        { "user": "Write the group rule on the methodology page. The rule is in second-iteration/direction.md." },
+        { "read": "AGENTS.md" },
+        { "read": "second-iteration/decisions/index.md" },
+        { "read": "second-iteration/decisions/method-and-data-rules.md" },
+        { "read": "second-iteration/direction.md" },
+        { "agent": "I wrote: top 8 groups, groups below 3 people hidden." },
+        { "user": "Add a row to the decision file too." },
+        { "agent": "Done." }
+      ]
+    },
+    {
+      "id": "99000004-0000-0000-0000-000000000000",
+      "hotSpot": "compare pages",
+      "start": "2026-11-13T09:00:00.000Z",
+      "goal": "Fix the cut dumbbell label on compare pages",
+      "items": [
+        { "user": "The dumbbell label is cut on the compare pages. Fix it." },
+        { "read": "AGENTS.md" },
+        { "read": "second-iteration/decisions/index.md" },
+        { "read": "second-iteration/decisions/compare.md" },
+        { "agent": "compare.md lists the bug. I moved the label inside the chart." },
+        { "user": "Add a row to the decision file." },
+        { "agent": "Done." }
+      ]
+    },
+    {
+      "id": "99000005-0000-0000-0000-000000000000",
+      "hotSpot": "compare pages",
+      "start": "2026-11-14T09:00:00.000Z",
+      "goal": "Add the Madrid vs Barcelona compare page",
+      "items": [
+        { "user": "Add a compare page for Madrid vs Barcelona." },
+        { "read": "AGENTS.md" },
+        { "read": "second-iteration/decisions/index.md" },
+        { "read": "second-iteration/decisions/compare.md" },
+        { "read": "pipeline/METHOD.md" },
+        { "agent": "Both cities have profiles. I added the pair." },
+        { "user": "Good. Build it locally." },
+        { "agent": "Built." }
+      ]
+    },
+    {
+      "id": "99000006-0000-0000-0000-000000000000",
+      "hotSpot": "method numbers",
+      "start": "2026-11-15T09:00:00.000Z",
+      "goal": "Know how many records a profile needs",
+      "items": [
+        { "user": "How many classified records does a city profile need?" },
+        { "read": "AGENTS.md" },
+        { "read": "pipeline/METHOD.md" },
+        { "agent": "200 classified records." },
+        { "user": "Thanks." },
+        { "agent": "Ok." }
+      ]
+    }
+  ]
+}

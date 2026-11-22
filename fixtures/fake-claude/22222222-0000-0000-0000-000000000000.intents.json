@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.031,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Know how the profile rule picks the groups of a city profile",
+        "corrections": [
+          { "message": 2, "text": "The current profile rule is in second-iteration/direction.md, not in pipeline/METHOD.md",
+            "quote": "The current rule is in second-iteration/direction.md", "cause": "missing-context" }
+        ] }
+    ]
+  }
+}

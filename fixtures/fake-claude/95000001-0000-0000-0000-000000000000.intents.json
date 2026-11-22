@@ -1,0 +1,18 @@
+{
+  "total_cost_usd": 0.02,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Change the city page rule to the top 5 groups",
+        "corrections": [
+          { "message": 2, "text": "Counts below 3 people must never be shown", "quote": "counts below 3 people must never be shown", "cause": "missing-context" }
+        ] },
+      { "start": 3, "goal": "Build the area page",
+        "corrections": [
+          { "message": 4, "text": "No tests in this project", "quote": "Do not write tests here", "cause": "missing-context" },
+          { "message": 5, "text": "Area pages use the blue map style", "quote": "Use the blue map style", "cause": "missing-context" },
+          { "message": 6, "text": "The user wants a bigger legend", "quote": "Make the legend bigger", "cause": "changed-mind" },
+          { "message": 7, "text": "The profile rule is in second-iteration/direction.md", "quote": "The rule is in direction.md", "cause": "missing-context" }
+        ] }
+    ]
+  }
+}

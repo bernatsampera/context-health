@@ -1,0 +1,9 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {"checks": [
+    {"correction": "c1", "found": false, "path": null, "quote": null},
+    {"correction": "c3", "found": true, "path": "CLAUDE.md", "quote": "Do not write, run, or keep tests."},
+    {"correction": "c4", "found": false, "path": null, "quote": null},
+    {"correction": "c5", "found": false, "path": null, "quote": null}
+  ]}
+}

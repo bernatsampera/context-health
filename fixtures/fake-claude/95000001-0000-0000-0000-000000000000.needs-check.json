@@ -1,0 +1,4 @@
+{
+  "total_cost_usd": 0.012,
+  "result": "Here is the check.\n```json\n{\"checks\": [\n  {\"correction\": \"c1\", \"found\": false, \"path\": null, \"quote\": null},\n  {\"correction\": \"c2\", \"found\": true, \"path\": \"CLAUDE.md\", \"quote\": \"Do not write, run, or keep tests.\"},\n  {\"correction\": \"c3\", \"found\": true, \"path\": \"second-iteration/decisions/area.md\", \"quote\": \"Area pages use the blue map style.\"},\n  {\"correction\": \"c5\", \"found\": true, \"path\": \"second-iteration/direction.md\", \"quote\": \"One method for all of Europe.\"}\n]}\n```"
+}

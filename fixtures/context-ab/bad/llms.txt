@@ -1,0 +1,35 @@
+# diversity-map
+
+Read only the links the task needs.
+
+## Direction and state
+
+- [AGENTS.md](AGENTS.md): Work rules and where to start.
+- [second-iteration/plan.md](second-iteration/plan.md): Phases, packages, and the proof for each package.
+- [second-iteration/status.md](second-iteration/status.md): Current state, running jobs, next steps, blockers.
+- [second-iteration/metrics.md](second-iteration/metrics.md): Weekly numbers and reading rules.
+- [second-iteration/decisions/index.md](second-iteration/decisions/index.md): One decision file per site section and per process.
+- [second-iteration/outreach/index.md](second-iteration/outreach/index.md): Outreach drafts (findings, Show HN, Reddit, data desks) and the send log.
+
+- [data/research/wave-1-finish-2026-10-20/README.md](data/research/wave-1-finish-2026-10-20/README.md): Local operation record for the 200-city server batch, exact city list, and live status paths.
+
+- [data/research/europe-expansion-2026-10-20/README.md](data/research/europe-expansion-2026-10-20/README.md): New Europe candidates, boundary checks, server batches, and held-city records.
+
+## Code
+
+- [README.md](README.md): Project purpose and local setup.
+- [pipeline/llms.txt](pipeline/llms.txt): Pipeline source, settings, jobs, and methods.
+- [pipeline/METHOD.md](pipeline/METHOD.md): How the numbers, profile rules, and classification work.
+- [pipeline/city-factory/README.md](pipeline/city-factory/README.md): Factory operation, MCP tools, and operating rules.
+- [frontend/llms.txt](frontend/llms.txt): Website source, data inputs, design rules, and build.
+- [social/tiktok/llms.txt](social/tiktok/llms.txt): Slideshow generator, designs, and upload steps.
+- [selfhost/README.md](selfhost/README.md): Vote service database and authentication deployment.
+- [Makefile](Makefile): Local command targets.
+
+## Archive
+
+- [first-iteration/README.md](first-iteration/README.md): The first iteration (27 August to 11 October 2026). Read only when a decision file points there.
+
+Local data and job state live in `data/`.
+
+- [data/research/growth-metrics-2026-10-21/README.md](data/research/growth-metrics-2026-10-21/README.md): Search Console reading, traffic access limits, and public coverage evidence.

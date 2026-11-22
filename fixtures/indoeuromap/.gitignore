@@ -1,0 +1,17 @@
+.env.local
+.env*.local
+first-iteration/archive/official-stats-path/data/
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+data/**
+!data/**/
+!data/**/_index.*.md
+
+# Whole-Europe 20M NUTS files: kept locally, replaced by geo/nuts/<CC>-<level>.geojson
+frontend/public/geo/nuts-2.geojson
+frontend/public/geo/nuts-3.geojson
+
+# Temporary design handoff folders (deleted after implementation)
+design_handoff_*/

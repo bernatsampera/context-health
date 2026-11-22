@@ -1,0 +1,20 @@
+{
+  "name": "context-health",
+  "version": "0.1.0",
+  "description": "See how the agent context of a project (CLAUDE.md, AGENTS.md, skills, docs) is placed and how well Claude Code sessions find what they need.",
+  "keywords": ["claude", "claude-code", "agents", "context", "claude-md", "agents-md", "cli"],
+  "license": "MIT",
+  "author": "bernatsampera",
+  "repository": { "type": "git", "url": "git+https://github.com/bernatsampera/context-health.git" },
+  "homepage": "https://github.com/bernatsampera/context-health#readme",
+  "bugs": { "url": "https://github.com/bernatsampera/context-health/issues" },
+  "type": "module",
+  "bin": { "context-health": "bin/context-health.mjs" },
+  "files": ["bin/", "src/", "vendor/", "README.md", "LICENSE"],
+  "scripts": {
+    "demo": "node bin/context-health.mjs fixtures/indoeuromap --claude-settings-home fixtures/claude-settings-home --old-path /Users/example/projects/indoeuromap",
+    "test": "node --test \"test/*.test.mjs\"",
+    "ab": "node fixtures/context-ab/ab.mjs"
+  },
+  "engines": { "node": ">=24" }
+}

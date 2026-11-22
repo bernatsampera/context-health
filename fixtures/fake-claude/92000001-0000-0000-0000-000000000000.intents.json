@@ -1,0 +1,4 @@
+{
+  "total_cost_usd": 0.01,
+  "result": { "intents": [ { "start": 1, "goal": "Check the direction in the worktree", "corrections": [] } ] }
+}

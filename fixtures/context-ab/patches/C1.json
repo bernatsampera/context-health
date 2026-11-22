@@ -1,0 +1,12 @@
+{
+  "title": "CLAUDE.md imports AGENTS.md with @ instead of a plain link",
+  "counterExample": "Routes get shorter, but Cheap and the score go down: AGENTS.md is now in the start load, so its recorded read counts as a re-read. Not part of better.",
+  "reason": "A plain Markdown link does not load AGENTS.md at start. The agent must spend one read on it in every session. With @AGENTS.md it is in the start load.",
+  "edits": [
+    {
+      "file": "CLAUDE.md",
+      "find": "Read [AGENTS.md](AGENTS.md) first. It names the files to read for each task.",
+      "replace": "@AGENTS.md\n\nAGENTS.md (loaded above) names the files to read for each task."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "total_cost_usd": 0.013,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": false, "path": null, "quote": null,
+        "now": { "path": "docs/not-in-the-input.md", "quote": "Do not write, run, or keep tests." } },
+      { "correction": "c2", "found": false, "path": null, "quote": null,
+        "now": { "path": "CLAUDE.md", "quote": "This sentence is not in the file." } },
+      { "correction": "c3", "found": true, "path": "CLAUDE.md", "quote": "Do not write, run, or keep tests.",
+        "now": { "path": "CLAUDE.md", "quote": "Prove work with a real run on the data." } },
+      { "correction": "c4", "found": true, "path": "CLAUDE.md", "quote": "This quote is not in the file at all.",
+        "now": { "path": "CLAUDE.md", "quote": "Prove work with a real run on the data." } },
+      { "correction": "c5", "found": false, "path": null, "quote": null, "now": "CLAUDE.md" },
+      { "correction": "c6", "found": false, "path": null, "quote": null, "now": ["CLAUDE.md", "Do not write, run, or keep tests."] },
+      { "correction": "c7", "found": false, "path": null, "quote": null, "now": { "path": "CLAUDE.md", "quote": "tests" } },
+      { "correction": "c8", "found": false, "path": null, "quote": null, "now": { "path": "CLAUDE.md" } },
+      { "correction": "c9", "found": false, "path": null, "quote": null },
+      { "correction": "c10", "found": false, "path": null, "quote": null, "now": null },
+      { "correction": "c11", "found": false, "path": null, "quote": null, "now": { "path": 5, "quote": 7 } },
+      { "correction": "c12", "found": false, "path": null, "quote": null,
+        "now": { "path": "~/.claude/CLAUDE.md", "quote": "Do not delete files. Move them to the Trash." } }
+    ]
+  }
+}

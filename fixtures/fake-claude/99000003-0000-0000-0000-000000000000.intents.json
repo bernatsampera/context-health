@@ -1,0 +1,12 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      {
+        "start": 1,
+        "goal": "Write the group rule on the methodology page",
+        "corrections": []
+      }
+    ]
+  }
+}

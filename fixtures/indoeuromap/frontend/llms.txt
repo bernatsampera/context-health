@@ -1,0 +1,12 @@
+# Frontend navigation
+
+- [README.md](README.md): Website setup, input data, design rules, public copy rules, and checks.
+- [package.json](package.json): Build, development, and data export scripts.
+- [astro.config.mjs](astro.config.mjs): Astro integrations and profile manifest build check.
+- [src/pages/](src/pages/): Public routes and static page generation.
+- [src/components/](src/components/): Page, map, data, and shared UI components.
+- [src/styles/global.css](src/styles/global.css): Color, typography, and display tokens.
+- [src/data/profile-manifest.json](src/data/profile-manifest.json): Generated accepted file hashes and blocked city results from the latest local sync.
+
+- [src/pages/methodology/[country].astro](src/pages/methodology/[country].astro): Redirects old country method URLs to the shared country differences section.
+- [src/pages/[country]/index.astro](src/pages/[country]/index.astro): Country map, saved sample counts, reading notes, and FAQs.

@@ -1,0 +1,54 @@
+{
+  "total_cost_usd": 0.012,
+  "result": {
+    "checks": [
+      {
+        "correction": "c1",
+        "found": false,
+        "path": null,
+        "quote": null,
+        "now": {
+          "path": "MEMORY_DIR/saved-rule.md",
+          "quote": "Ask the user before you change a decision file."
+        }
+      },
+      {
+        "correction": "c2",
+        "found": false,
+        "path": null,
+        "quote": null,
+        "now": {
+          "path": "MEMORY_DIR/loose-note.md",
+          "quote": "Each export goes to the folder exports/."
+        }
+      },
+      {
+        "correction": "c3",
+        "found": false,
+        "path": null,
+        "quote": null,
+        "now": {
+          "path": "second-iteration/decisions/city.md",
+          "quote": "Five cities have a sample summary: Berlin, Madrid, Hamburg, Milan, Barcelona."
+        }
+      },
+      {
+        "correction": "c4",
+        "found": false,
+        "path": null,
+        "quote": null,
+        "now": {
+          "path": "~/.claude/CLAUDE.md",
+          "quote": "Do not delete files. Move them to the Trash."
+        }
+      },
+      {
+        "correction": "c5",
+        "found": false,
+        "path": null,
+        "quote": null,
+        "now": null
+      }
+    ]
+  }
+}

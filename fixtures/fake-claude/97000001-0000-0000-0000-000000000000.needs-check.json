@@ -1,0 +1,6 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {"checks": [
+    {"correction": "c1", "found": false, "path": null, "quote": null}
+  ]}
+}

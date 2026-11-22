@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "cities": [
+    { "slug": "barcelona", "name": "Barcelona", "country": "spain", "nonEuropeanShare": 0.21, "published": true },
+    { "slug": "berlin", "name": "Berlin", "country": "germany", "nonEuropeanShare": 0.18, "published": true }
+  ]
+}

@@ -1,0 +1,3 @@
+# TikTok slideshow navigation
+
+- [README.md](README.md): Slideshow rules, design ID mapping, commands, and current limits.

@@ -1,0 +1,7 @@
+# Factory navigation
+
+- [README.md](README.md): AI operation, state, completion checks, and current tool limits.
+- [pyproject.toml](pyproject.toml): Dependencies and CLI entry points.
+- [src/city_factory/mcp_server.py](src/city_factory/mcp_server.py): Saved data questions through diversity-map-data.
+
+The admin UI, its two services (`flow_svc.py`, `result_svc.py`), and the unused `job_runner.py` were removed on 2026-10-18. They are archived in `first-iteration/pipeline/city-factory/src/city_factory/`.

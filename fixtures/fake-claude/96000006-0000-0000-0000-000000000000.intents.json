@@ -1,0 +1,9 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      { "start": 1, "goal": "Read the city rule", "corrections": [] },
+      { "start": 2, "goal": "Check the city rule against the method", "corrections": [] }
+    ]
+  }
+}

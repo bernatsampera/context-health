@@ -1,0 +1,9 @@
+{
+  "title": "CLAUDE.md links the hot files directly",
+  "reason": "The sessions show three files that most intents need: the profile rule, the compare decisions and METHOD.md. A direct link from the start load makes each of them 1 step away.",
+  "edits": [
+    { "file": "CLAUDE.md",
+      "find": "No tests in this project.",
+      "replace": "## Files for the common tasks\n\n- The current profile rule: [second-iteration/direction.md](second-iteration/direction.md)\n- Comparison pages: [second-iteration/decisions/compare.md](second-iteration/decisions/compare.md)\n- Numbers, profiles and the map: [pipeline/METHOD.md](pipeline/METHOD.md)\n\nNo tests in this project." }
+  ]
+}

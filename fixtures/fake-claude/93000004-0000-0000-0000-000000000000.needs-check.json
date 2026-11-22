@@ -1,0 +1,10 @@
+{
+  "total_cost_usd": 0.009,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": false, "path": null, "quote": null, "now": null },
+      { "correction": "c2", "found": false, "path": null, "quote": null, "now": null },
+      { "correction": "c3", "found": false, "path": null, "quote": null, "now": null }
+    ]
+  }
+}

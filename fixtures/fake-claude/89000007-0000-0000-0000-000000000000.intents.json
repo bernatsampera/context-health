@@ -1,0 +1,43 @@
+{
+  "total_cost_usd": 0.01,
+  "result": {
+    "intents": [
+      {
+        "start": 1,
+        "goal": "Change the city decision and export the data",
+        "corrections": [
+          {
+            "message": 2,
+            "text": "Ask the user before a decision file changes",
+            "quote": "Ask me before you change a decision file",
+            "cause": "missing-context"
+          },
+          {
+            "message": 3,
+            "text": "Each export goes to the folder exports/",
+            "quote": "Put each export in exports/",
+            "cause": "missing-context"
+          },
+          {
+            "message": 4,
+            "text": "Five cities have a sample summary",
+            "quote": "Only five cities have a sample summary",
+            "cause": "missing-context"
+          },
+          {
+            "message": 5,
+            "text": "Move files to the Trash, do not delete them",
+            "quote": "Never delete a file, use the Trash",
+            "cause": "missing-context"
+          },
+          {
+            "message": 6,
+            "text": "The owner reads each release note before it goes out",
+            "quote": "I read each release note first",
+            "cause": "missing-context"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "total_cost_usd": 0.02,
+  "result": {
+    "checks": [
+      { "correction": "c1", "found": false, "path": null, "quote": null,
+        "now": { "path": "MEMORY_DIR/limit-match-3.md", "quote": "Brantholt sevrik, match file 3." } }
+    ]
+  }
+}

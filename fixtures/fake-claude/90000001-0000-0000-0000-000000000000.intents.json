@@ -1,0 +1,4 @@
+{
+  "total_cost_usd": 0.0911,
+  "result": "```json\n{\"intents\": [{\"start\": 1, \"goal\": \"Run the long list of small steps\", \"corrections\": []}]}\n```"
+}
