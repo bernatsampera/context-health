@@ -48,7 +48,7 @@ const run = (args, { input = '', ask = false } = {}) => {
     CONTEXT_HEALTH_AGENT_BIN: path.join(repo, 'test', 'fake-agent.mjs'), CONTEXT_HEALTH_FAKE_AGENT_LOG: agentLog,
     CONTEXT_HEALTH_FAKE_AGENT_PROJECTS: path.join(settingsHome, 'projects') };
   if (ask) env.CONTEXT_HEALTH_ASK = '1'; else delete env.CONTEXT_HEALTH_ASK;
-  const result = spawnSync(process.execPath, [cli, ...args, '--out', out, '--no-open'], { env, input, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [cli, ...args, '--out', out, '--no-open', '--ignore', 'none'], { env, input, encoding: 'utf8' });
   assert.equal(result.status, 0, `context-health failed:\n${result.stdout}\n${result.stderr}`);
   return result.stdout;
 };
@@ -57,6 +57,18 @@ const json = name => JSON.parse(readFileSync(path.join(out, name), 'utf8'));
 const html = () => readFileSync(path.join(out, 'report.html'), 'utf8');
 
 test('W1: no terminal and no --yes: no model call', () => {
+  for (const flags of [['--yes', '--no-calls'], ['--no-calls', '--intents']]) {
+    const result = spawnSync(process.execPath, [cli, project, '--out', out, ...flags, '--no-open'], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Choose either/);
+    assert.equal(existsSync(out), false, 'conflicting flags must fail before writing settings');
+  }
+  for (const flags of [[], ['--headless']]) {
+    const result = spawnSync(process.execPath, [cli, 'fix', project, '--out', out, '--no-open', '--no-calls', ...flags], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Fix needs Claude/);
+    assert.equal(existsSync(out), false);
+  }
   const stdout = run([project, '--claude-settings-home', settingsHome, '--old-path', OLD, '--cache', cache]);
   assert.equal(calls(), 0);
   assert.doesNotMatch(stdout, /Run them\?/);
@@ -73,7 +85,7 @@ test('W3: the options are saved', () => {
 
 test('W2, W1: the question comes; "n" makes no call', () => {
   const stdout = run([project], { ask: true, input: 'n\n' });
-  assert.match(stdout, /new sessions? to analyse: about \d+ or more sonnet calls \(claude -p\)\. Run them\? \[y\/N\]/);
+  assert.match(stdout, /sessions? to analyse\. At least \d+ sonnet calls through your Claude account\..*Run them\? \[y\/N\]/);
   assert.equal(calls(), 0);
   assert.match(stdout, /Saved options: old paths \/Users\/example\/projects\/indoeuromap/);
 });
@@ -94,12 +106,14 @@ test('W2: with all answers in the cache there is no question', () => {
   assert.equal(calls(), before);
 });
 
-test('W5: the history grows only on a change, and the page shows the last other result', () => {
+test('W5: the history grows only on a change, and cold and paid samples are not compared', () => {
   // Run 1 and 2: the same result (one line). Run 3: the calls change it. Run 4: the same as run 3.
   const history = json('history.json');
   assert.equal(history.length, 2);
   assert.ok(history.every(item => item.kind === 'report'));
-  assert.match(html(), /<p class="state trend" id="trend"[^>]*>Last run \(/);
+  assert.equal(history[0].analysed, 0);
+  assert.ok(history[1].analysed > 0);
+  assert.doesNotMatch(html(), /id="trend"/);
 });
 
 test('W9: the page commands need no saved option', () => {
@@ -127,7 +141,8 @@ test('W6, W7, W8: fix starts the agent, then writes the report again without the
   assert.ok(model.sessions.skipped.some(item => item.reason === 'fix-session' && item.file === `${sessionId}.jsonl`));
   const history = json('history.json');
   assert.equal(history.at(-1).kind, 'after-fix');
-  assert.match(stdout, /last run \([^)]*\): score .*now: score /);
+  assert.match(stdout, /Previous comparable result \(/);
+  assert.match(html(), /id="trend"[^>]*>Previous comparable result \(/);
   // The artifact: the state after the fix (W4 below reuses the report folder for another project).
   const artifact = path.join(repo, 'out', 'e2e-flow');
   mkdirSync(artifact, { recursive: true });

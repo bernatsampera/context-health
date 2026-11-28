@@ -206,7 +206,7 @@ const sessionOf = call => head(call).split(' ').at(-1);
 function run(name, project, home, { intents = true, cache = name, out = path.join(work, 'out', name) } = {}) {
   const before = callsNow().length;
   mkdirSync(out, { recursive: true });
-  const args = [cli, project, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--no-save', '--old-path', OLD];
+  const args = [cli, project, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--verbose', '--ignore', 'none', '--no-save', '--old-path', OLD];
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
   assert.equal(result.status, 0, `${name}: ${result.stderr}`);
@@ -422,14 +422,17 @@ test('T4: the cache key has the prompt version, and a v2 cache file is not a v3 
 
 // ---------- the checks: the place of each fix ----------
 
-test('X1, X4: each fix has a question as its last key, and the limit, the ids and the order of step 11 stay', () => {
+test('X1, X4: each fix has a question and evidence, and the limit, IDs and rank stay', () => {
   for (const { name, report } of [r1, r2, r3, bare]) {
     const fixes = report.fixes;
     const list = fixesOf(report);
     assert.deepEqual(Object.keys(fixes), ['limit', 'total', 'list', 'smaller', 'left'], name);
     for (const fix of list) {
-      assert.deepEqual(Object.keys(fix), ['id', 'kind', 'needs', 'files', 'target', 'line', 'text', 'question'], `${name} ${fix.id}`);
+      assert.deepEqual(Object.keys(fix).filter(key => !['rule', 'editFiles'].includes(key)), ['id', 'kind', 'needs', 'files', 'target', 'line', 'text', 'question', 'sessionIds', 'fingerprint'], `${name} ${fix.id}`);
       assert.ok(['find', 'close', 'told'].includes(fix.question), `${name} ${fix.id}: ${fix.question}`);
+      assert.match(fix.fingerprint, /^[a-f0-9]{64}$/);
+      assert.equal(new Set(fix.sessionIds).size, fix.sessionIds.length);
+      for (const id of fix.sessionIds) assert.ok(report.sessions.list.some(session => session.sessionId === id), id);
     }
     assert.equal(fixes.limit, 10, name);
     assert.ok(fixes.list.length <= 10, name);

@@ -13,9 +13,10 @@
 // `close`: the file has a route, but no link by name near the start (a folder link, a far linker, a linker that is
 // not named). `told`: a rule that the user typed. A task fact is not in `found.told`, so it gets no fix.
 // The page and the prompt both read `fixes.list`, so they show the same texts.
+import { createHash } from 'node:crypto';
 import { START_WHAT } from './collect.mjs';
 import { isNamed } from './context-files.mjs';
-import { foundFiles } from './found.mjs';
+import { foundFiles, searchedWayOf } from './found.mjs';
 import { fixContext } from './health.mjs';
 
 export const FIX_LIMIT = 10;
@@ -53,6 +54,8 @@ export function buildFixes(model) {
   const add = (kind, needs, files, target, line, text, question = QUESTION[kind]) =>
     fixes.push({ kind, needs, files, target, line: line ?? null, text: text.replace(/[\u2013\u2014]/g, '-'), question });
 
+  const extra = values => Object.assign(fixes.at(-1), values);
+
   // ----- root: the new start file, and the lost files under it -----
   if (found.root) {
     const root = found.root;
@@ -85,6 +88,7 @@ export function buildFixes(model) {
       const folder = key.split('\u0000')[1];
       add('no-route', uses, paths, start, null, `Write one index file in the folder ${folder}/ (for example ${folder}/index.md), and link it from ${startRef}. ` +
         `In the index, name each file and say when to read it. It covers ${plural(files.length, 'needed file')} with no route (${plural(uses, 'need')}): ${names(files, 'need')}.`);
+      extra({ editFiles: [start, folder + "/index.md"] });
       continue;
     }
     const [group] = list;
@@ -109,6 +113,7 @@ export function buildFixes(model) {
     } else {
       add('told', item.uses, [], start, null, `Add this fact to ${startRef}, or to a file that it links: "${short(item.text)}". ${said}`);
     }
+    extra({ rule: item.text, ...(item.savedPath ? { editFiles: [item.savedPath] } : {}) });
   }
 
   // ----- searched: the files with a route that the agent searched, grouped by what links them -----
@@ -172,11 +177,40 @@ export function buildFixes(model) {
       (fact.places.length > MAX_NAMES ? `; and ${num(fact.places.length - MAX_NAMES)} more` : '');
     add('one-source', fact.needed, [], fact.keep, null,
       `Make the files agree on "${short(fact.what)}": ${places}. Ask the user which value is right, keep it only in ${fact.keep}, and link to it from the others.`);
+    extra({ editFiles: fact.places.map(place => place.path) });
   }
 
   fixes.sort((a, b) => b.needs - a.needs || KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || cmp(a.target, b.target) ||
     cmp(a.files[0] ?? '', b.files[0] ?? '') || cmp(a.text, b.text));
-  const all = fixes.map((fix, k) => ({ id: `x${k + 1}`, ...fix }));
+  const all = fixes.map((fix, k) => {
+    const files = new Set(fix.kind === 'one-source' ? fix.editFiles : fix.files);
+    const evidence = new Set();
+    for (const intent of model.routes.intents) {
+      if (intent.needs.some(need => files.has(need.path) && (fix.kind !== 'searched' || searchedWayOf(need, ctx.mapFiles)))) evidence.add(intent.sessionId);
+    }
+    for (const session of model.needs.sessions) {
+      const hasRule = fix.kind !== 'searched' && session.intents.some(intent => intent.needs.some(need => need.kind === 'missing' &&
+        ((fix.rule && need.text?.trim().replace(/\s+/g, ' ') === fix.rule) || files.has(need.savedPath))));
+      if (hasRule) evidence.add(session.sessionId);
+    }
+    const sessionIds = [...evidence];
+    return { id: 'x' + (k + 1), ...fix, sessionIds, fingerprint: fingerprintOf(fix) };
+  });
   return { limit: FIX_LIMIT, total: all.length, list: all.slice(0, FIX_LIMIT), smaller: all.slice(FIX_LIMIT),
     left: { copies: facts.filter(fact => !fact.differ).length, notNamed } };
+}
+
+// A report numbers findings in display order. Look them up in that same report.
+const fingerprintOf = fix => createHash('sha256').update(JSON.stringify([fix.kind, fix.target, fix.text])).digest('hex');
+
+export function selectFindings(model, id, fingerprint) {
+  if (id === undefined) return model.fixes.list;
+  const finding = [...model.fixes.list, ...(model.fixes.smaller || [])].find(item => item.id === id);
+  if (!finding) throw new Error('This finding is missing from the current report.');
+  if (fingerprint !== undefined && fingerprintOf(finding) !== fingerprint) throw new Error('This finding changed. Open the latest report before fixing it.');
+  return [finding];
+}
+
+export function relatedFiles(finding) {
+  return [...new Set([finding.target, ...finding.files, ...(finding.editFiles || [])].filter(Boolean))];
 }

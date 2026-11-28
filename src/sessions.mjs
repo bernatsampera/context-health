@@ -50,6 +50,23 @@ const cut = text => {
   return { text: chars.slice(0, TEXT_CUT).join(''), cut: chars.length > TEXT_CUT };
 };
 
+// The start of an agent answer as plain text, for the session overview: no code blocks, no Markdown marks, whole sentences.
+const ANSWER_CUT = 260;
+export function excerpt(markdown) {
+  const text = markdown.replace(/```[\s\S]*?(?:```|$)/g, ' ').replace(/^\s*\|.*\|\s*$/gm, ' ').replace(/^#+\s+(.*?)[.:]?\s*$/gm, '$1:')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*\*|__|`/g, '').replace(/^\s*(?:[-*+]|\d+\.|>)\s+/gm, '').replace(/\s+/g, ' ').trim();
+  if (text.length <= ANSWER_CUT) return text;
+  const part = text.slice(0, ANSWER_CUT);
+  const end = Math.max(part.lastIndexOf('. '), part.lastIndexOf('! '), part.lastIndexOf('? '));
+  return end > ANSWER_CUT / 3 ? part.slice(0, end + 1) : `${part.replace(/\s+\S*$/, '')}...`;
+}
+
+// The title of a session: the name that the user gave, else the newest title of Claude Code, else null.
+function titleOf(records) {
+  const last = (type, key) => records.findLast(record => record.type === type && typeof record[key] === 'string' && record[key].trim())?.[key].trim();
+  return last('custom-title', 'customTitle') ?? last('ai-title', 'aiTitle') ?? null;
+}
+
 // ---------- paths ----------
 
 // The worktree part at the start of a path under a root. Claude Code makes its worktrees in
@@ -90,6 +107,55 @@ function pathMapper({ roots, home, claudeSettingsHome }) {
 
 const isRelative = rel => rel && !rel.startsWith('~') && !rel.startsWith('/');
 
+export const projectLocation = rel => typeof rel === 'string' && isRelative(rel) && rel !== '..' && !rel.startsWith('../')
+  && !/[\\\x00-\x1f\x7f]/u.test(rel) && !/^[A-Za-z]:/.test(rel) && P.normalize(rel) === rel;
+
+function safeQuery(query) {
+  if (typeof query !== 'string' || !query.trim() || /[\x00-\x1f\x7f`]|\$\(/u.test(query)
+    || /(?:^|[^\w./*?-])(?:\/|~\/|\.\.\/|[A-Za-z]:[\\/])/.test(query)) return null;
+  return query.slice(0, 200);
+}
+
+export const explorationCoverage = session => session.explorationCoverage === 'recorded' ? 'recorded' : 'partial';
+
+// Shell operands can be patterns, variables or redirections. Only a literal
+// directory before the first wildcard provides a location for the map.
+function shellScope(value) {
+  if (typeof value !== 'string' || !value || /[\x00-\x1f$`|;&<>{}()"'\\]/u.test(value)
+    || /(?:^|\/)(?:-[^/]*|~[^/]*)(?:\/|$)/u.test(value) || /\s-{1,2}\w/.test(value)
+    || /(?:^|\/)(?:bash|sh|zsh|cd|cat|echo|env|find|git|grep|ls|rg|sed|awk|node|npm|python3?)\s+/.test(value)) return null;
+  const wildcard = value.search(/[*?\[]/);
+  if (wildcard < 0) return value;
+  if (value.slice(wildcard).split('/').includes('..')) return null;
+  const prefix = value.slice(0, wildcard);
+  return prefix.slice(0, prefix.lastIndexOf('/') + 1).replace(/\/$/, '') || (value.startsWith('/') ? '/' : '.');
+}
+
+export function explorationEvents(session) {
+  return (session.events || []).flatMap(event => {
+    const common = { i: event.i, message: event.message, thread: event.thread };
+    if (event.kind === 'read' && projectLocation(event.path) && (event.tool !== 'Bash' || shellScope(event.path) === event.path))
+      return [{ ...common, kind: 'read', path: event.path }];
+    if (event.kind !== 'search' || !projectLocation(event.target)) return [];
+    const shell = event.tool === 'Bash' || !event.tool;
+    const target = shell ? shellScope(event.target) : event.target;
+    if (!target) return [];
+    // A combined shell result can name a real path without telling us which
+    // command printed it. The route scorer can still use the combined output.
+    const paths = ['failed', 'unknown'].includes(event.outcome) ? [] : (event.resultPaths || []).filter(p =>
+      projectLocation(p) && !p.includes(':') && (!shell || shellScope(p) === p));
+    const outcome = event.outcome === 'failed' ? 'failed' : paths.length ? 'matches'
+      : event.outcome === 'empty' && !event.resultPaths?.length ? 'empty' : 'unknown';
+    const operation = ['list', 'search', 'unknown'].includes(event.operation) ? event.operation
+      : ['Grep', 'Glob'].includes(event.tool) || event.query ? 'search' : 'unknown';
+    return [{ ...common, kind: 'search', operation, tool: ['Bash', 'Grep', 'Glob'].includes(event.tool) ? event.tool : undefined,
+      query: safeQuery(event.query), target,
+      targetKind: target !== event.target || target === '.' ? 'folder'
+        : ['file', 'folder'].includes(event.targetKind) ? event.targetKind : 'unknown',
+      resultPaths: paths, outcome }];
+  });
+}
+
 // Does `text` (the text of a source at `base`, a folder in report form, or null) name the path `target`?
 // Full path, or the correct relative path from `base`. A base name alone matches only when that is the right path.
 function textNames(text, target, base, mapPath) {
@@ -122,44 +188,77 @@ function optionValue(words, names) {
 }
 
 // The first search program of a Bash command: its pattern and folder, or null.
-function shellSearch(command, cwd) {
+function shellSearchOperands(command, cwd) {
   let dir = cwd;
   for (const segment of splitSegments(command)) {
     let words = removePrefixes(shellWords(segment.text));
     if (words[0] === 'cd' && words[1]) {
-      dir = P.resolve(dir, words[1].replace(/^~(?=\/|$)/, process.env.HOME || '~'));
+      if (shellScope(words[1]) !== words[1]) return null;
+      dir = P.resolve(dir, words[1]);
       words = removePrefixes(words.slice(2));
     }
     if (!words.length) continue;
     const program = P.basename(words[0]);
-    if (segment.separator === '|' && PIPE_FILTERS.has(program)) continue;
-    const args = words.slice(1);
+    if (segment.separator === '|') continue;
+    // Redirection destinations are not search operands.
+    const args = words.slice(1).filter(arg => !/^\d*(?:>>?|<)\S+$/.test(arg));
+    if (args.some(arg => /[<>]/.test(arg))) return null;
     const plain = args.filter(arg => !arg.startsWith('-'));
     if (program === 'git') {
-      const sub = args.find(arg => !arg.startsWith('-'));
-      if (sub === 'ls-files' || sub === 'ls-tree') return { program: 'git', query: null, target: '.', dir };
+      if (args[0] === 'ls-files' && args.slice(1).every(arg => !arg.startsWith('-') || arg === '--')) {
+        const operands = args.slice(1).filter(arg => arg !== '--');
+        if (operands.length <= 1) return { program: 'git', query: null, target: operands[0] || '.', dir };
+      }
       continue;
     }
     if (!SEARCH_PROGRAMS.has(program)) continue;
-    if (program === 'ls' || program === 'tree') return { program, query: null, target: plain[0] || '.', dir };
+    if (program === 'ls' || program === 'tree') {
+      if (args.some(arg => arg.startsWith('-') && !/^(?:--|-[1AaBbcCdFfGghikLlmnopqRrSstTuUvxX]+)$/.test(arg))) return null;
+      if (plain.length > 1) {
+        if (program !== 'ls' || plain.some(operand => shellScope(operand) !== operand)) return null;
+        const operands = plain.map(operand => P.resolve(dir, operand));
+        let parent = P.dirname(operands[0]);
+        while (!operands.every(operand => operand === parent || !P.relative(parent, operand).split('/').includes('..')))
+          parent = P.dirname(parent);
+        return { program, query: null, target: parent, dir, multiple: true };
+      }
+      return { program, query: null, target: plain[0] || '.', dir };
+    }
     if (program === 'find') {
       const firstOption = args.findIndex(arg => arg.startsWith('-'));
       const roots = (firstOption < 0 ? args : args.slice(0, firstOption));
-      return { program, query: optionValue(args, ['-name', '-iname', '-path', '-ipath']), target: roots[0] || '.', dir };
+      return roots.length <= 1 ? { program, query: optionValue(args, ['-name', '-iname', '-path', '-ipath']), target: roots[0] || '.', dir } : null;
     }
-    if (program === 'fd') return { program, query: plain[0] ?? null, target: plain[1] || '.', dir };
+    if (program === 'fd') {
+      if (args.some(arg => arg.startsWith('-') && !/^(?:--|-[HIFiLas0]+)$/.test(arg)) || plain.length > 2) return null;
+      return { program, query: plain[0] ?? null, target: plain[1] || '.', dir };
+    }
     // grep, rg: skip option values, then pattern and folder.
     const rest = [];
     let pattern = optionValue(args, ['-e', '--regexp']);
     for (let i = 0; i < args.length; i += 1) {
       const arg = args[i];
-      if (['-e', '--regexp', '-A', '-B', '-C', '-m', '-g', '--glob', '-t', '--type', '--include', '--exclude', '--max-count'].includes(arg)) { i += 1; continue; }
+      if (['-e', '--regexp', '-A', '-B', '-C', '-m', '-g', '--glob', '-t', '--type', '--include', '--exclude', '--max-count'].includes(arg)) {
+        if (!args[i + 1]) return null;
+        i += 1;
+        continue;
+      }
       if (!arg.startsWith('-')) rest.push(arg);
+      else if (!/^(?:--|--(?:files|hidden|no-ignore|follow|fixed-strings|files-with-matches|line-number|ignore-case|smart-case|no-heading|heading|no-filename|with-filename|word-regexp|count|quiet)|--[\w-]+=.+|-[abcEFHhilLnoPRrSsUuvwxz0]+|-[ABCm]\d+)$/.test(arg)) return null;
     }
+    if (program === 'rg' && args.includes('--files')) return rest.length <= 1 ? { program, listing: true,
+      query: optionValue(args, ['-g', '--glob']), target: rest[0] || '.', dir } : null;
     if (pattern == null) pattern = rest.shift() ?? null;
-    return { program, query: pattern, target: rest[0] || '.', dir };
+    return rest.length <= 1 ? { program, query: pattern, target: rest[0] || '.', dir } : null;
   }
   return null;
+}
+
+function shellSearch(command, cwd) {
+  const search = shellSearchOperands(command, cwd);
+  if (!search) return null;
+  const target = shellScope(search.target);
+  return target ? { ...search, target, globOperand: search.target !== target } : null;
 }
 
 // The parts of a command that print output. A bare cd and a pipe filter do not count.
@@ -210,7 +309,15 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
   };
   const baseOf = rel => rel === '.' ? '.' : P.dirname(rel);
 
+  // The last agent text after each message: what the agent said when it stopped. Only its start is kept.
+  const answers = [];
+  const keepAnswer = () => {
+    const text = messages.length && lastText ? excerpt(lastText) : '';
+    if (text) answers.push({ message: messages.length, text });
+  };
+
   const addMessage = (kind, fullText) => {
+    keepAnswer();
     const n = messages.length + 1;
     const shown = cut(fullText);
     messages.push({ n, kind, text: shown.text, cut: shown.cut, mentions: [], firstEvent: events.length });
@@ -248,36 +355,41 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
   };
 
   // Paths listed in a search result text: one per line, or the part before the first ':'.
-  const outputPaths = (text, dir) => {
+  const outputPaths = (text, dir, scope = dir) => {
     const found = [];
     for (const raw of text.split('\n')) {
       const line = raw.trim();
       if (!line) continue;
-      for (const candidate of [line, line.split(':')[0]]) {
-        if (!candidate || /\s/.test(candidate)) continue;
-        const rel = mapPath(candidate, dir);
-        const keep = fileSet.has(rel) || (!isRelative(rel) && /[./]/.test(candidate))
-          || (isRelative(rel) && candidate.includes('/') && /\.[A-Za-z0-9]+$/.test(candidate));
-        if (keep && rel !== '.' && !found.includes(rel)) { found.push(rel); break; }
-      }
+      const candidate = line.split(':')[0];
+      if (!candidate || /[\x00-\x1f<>]/.test(candidate)) continue;
+      const scoped = mapPath(candidate, scope);
+      const fromCwd = mapPath(candidate, dir);
+      const rel = fileSet.has(scoped) && !fileSet.has(fromCwd) ? scoped : fromCwd;
+      const keep = fileSet.has(rel) || (!/\s/.test(candidate) && candidate.includes('/') && /\.[A-Za-z0-9]+$/.test(candidate));
+      if (keep && rel !== '.' && !found.includes(rel)) found.push(rel);
     }
     return found;
   };
-  const lsPaths = (text, targetAbs) => {
+  const lsPaths = (text, targetAbs, cwd) => {
     const found = [];
     let dir = targetAbs;
     for (const raw of text.split('\n')) {
       const line = raw.trim();
       if (!line || /^total \d+/.test(line)) continue;
-      if (line.endsWith(':') && !line.includes(' ')) { dir = P.resolve(targetAbs, line.slice(0, -1)); continue; }
-      const parts = line.split(/\s+/);
-      const name = (/^[dlcbps-][rwxsStT-]{9}/.test(line) ? parts.at(-1) : line).replace(/[/*@=|]$/, '');
+      if (line.endsWith(':') && !line.includes(' ')) {
+        dir = P.resolve(cwd, line.slice(0, -1));
+        continue;
+      }
+      const long = line.match(/^[dlcbps-][rwxsStT-]{9}[+@.]?\s+\d+\s+\S+\s+\S+\s+\d+\s+(?:\S+\s+){3}(.+)$/);
+      if (!long && /^[dlcbps-][rwxsStT-]{9}/.test(line)) continue;
+      const name = (long ? long[1].split(' -> ')[0] : line).replace(/[/*@=|]$/, '');
       if (!name || name === '.' || name === '..') continue;
       // A line with a full path is not a name in the listed folder: `ls` got full paths, or another part of the
       // command printed the line (then the path ends at the first ":").
       const full = name.startsWith('/') ? name.split(':')[0] : null;
       if (full != null ? /\s/.test(full) : (name.includes('/') && /\s/.test(name))) continue;
       const rel = mapPath(full ?? P.join(dir, name));
+      if (/\s/.test(name) && !fileSet.has(rel) && ctx.targetKind(rel) === 'unknown') continue;
       if (rel && rel !== '.' && !found.includes(rel)) found.push(rel);
     }
     return found;
@@ -311,6 +423,11 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
     const cwd = record.cwd || call.cwd;
     const resultText = textOf(block.content);
     const isError = block.is_error === true;
+    const recordSearch = (operation, query, target, resultPaths, outcome) => {
+      const targetKind = ctx.targetKind(target);
+      pushEvent(thread, { kind: 'search', tool: name, path: null, tokens: tokens(resultText),
+        operation, query, target, targetKind, resultPaths, outcome }, null, sources);
+    };
     if (name === 'Read') {
       const rel = mapPath(input.file_path, cwd);
       if (!rel) return;
@@ -329,16 +446,34 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
     }
     if (name === 'Grep' || name === 'Glob') {
       const dirAbs = input.path ? P.resolve(cwd || '/', input.path) : cwd;
-      pushEvent(thread, { kind: 'search', tool: name, path: null, tokens: tokens(resultText),
-        query: input.pattern ?? null, target: mapPath(dirAbs, cwd) || '.', resultPaths: isError ? [] : outputPaths(resultText, cwd) }, null, sources);
+      const result = record.toolUseResult;
+      const paths = isError ? [] : Array.isArray(result?.filenames) && result.filenames.length
+        ? result.filenames.filter(p => typeof p === 'string').map(p => mapPath(p, cwd))
+        : outputPaths(resultText, cwd, dirAbs);
+      const empty = /^(?:No (?:files|matches)(?: found)?[.!]?|Found 0 files?)$/i.test(resultText.trim())
+        || result?.numFiles === 0 && result?.mode === 'files_with_matches';
+      recordSearch('search', input.pattern ?? null, mapPath(dirAbs, cwd) || '.', paths,
+        isError ? 'failed' : paths.length ? 'matches' : empty ? 'empty' : 'unknown');
       return;
     }
     if (name !== 'Bash' || typeof input.command !== 'string') return;
     const command = input.command;
     const kind = classifyShellCommand(cwd ? `cd '${cwd.replaceAll("'", "'\\''")}' && ${command}` : command,
       { home: ctx.home });
+    // The search of a command that also does something else (`npm run build; ls docs`, `ls && cat README*`).
+    // Its output holds other lines too, so only the files that the project has count as results.
+    const searchInside = () => {
+      const search = isError ? null : shellSearch(command, cwd || '/');
+      if (!search) return;
+      const targetAbs = P.resolve(search.dir, search.target);
+      const listed = search.program === 'ls' && !search.globOperand ? lsPaths(resultText, search.multiple ? search.dir : targetAbs, search.dir) : [];
+      const resultPaths = [...new Set([...listed, ...outputPaths(resultText, search.dir)])].filter(rel => fileSet.has(rel));
+      if (!resultPaths.length) return;
+      recordSearch(search.program === 'ls' || search.listing ? 'list' : 'search', search.query, mapPath(targetAbs), resultPaths,
+        outputParts(command) > 1 ? 'unknown' : 'matches');
+    };
     if (kind.kind === 'file') {
-      const files = (kind.files || []).filter(item => !item.revision && !/[$*?]/.test(item.path));
+      const files = (kind.files || []).filter(item => !item.revision && shellScope(item.path) === item.path);
       const share = files.length ? Math.ceil(tokens(resultText) / files.length) : 0;
       // The output comes from one program only when the command has one part that prints (cd and pipe filters do not count).
       const alone = outputParts(command) === 1;
@@ -347,6 +482,7 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
         const rel = mapPath(item.path, cwd);
         const missing = isError && new RegExp(`${P.basename(item.path).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: No such file`).test(resultText);
         if (missing) { pushEvent(thread, fileEvent('miss', 'Bash', rel, tokens(resultText), {}, sources), null, sources); continue; }
+        if (isError) continue;
         let text = resultText;
         let count = tokens(resultText);
         if (!alone || files.length > 1) {
@@ -362,19 +498,30 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
       // A command of several parts (for example cat x && ls y): the rest of the output is a search result.
       if (!alone && !isError && first !== null) {
         const search = shellSearch(command, cwd || '/');
-        const resultPaths = search?.program === 'ls' ? lsPaths(resultText, P.resolve(search.dir, search.target))
+        const resultPaths = search?.program === 'ls' ? lsPaths(resultText, P.resolve(search.dir, search.target), search.dir)
           : outputPaths(resultText, search?.dir || cwd);
         sources.push({ kind: 'search', event: first, resultPaths });
-      }
+      } else if (!alone && first === null) searchInside();
       return;
     }
-    if (kind.kind !== 'explore') return;
+    if (kind.kind !== 'explore') { searchInside(); return; }
     const search = shellSearch(command, cwd || '/');
     if (!search) return;
     const targetAbs = P.resolve(search.dir, search.target);
-    const resultPaths = isError ? [] : search.program === 'ls' ? lsPaths(resultText, targetAbs) : outputPaths(resultText, search.dir);
-    pushEvent(thread, { kind: 'search', tool: 'Bash', path: null, tokens: tokens(resultText), query: search.query,
-      target: mapPath(targetAbs) || '.', resultPaths }, null, sources);
+    const listing = ['ls', 'tree', 'git'].includes(search.program) || search.listing;
+    const simple = outputParts(command) === 1 && !/[|<>]/.test(command);
+    const target = mapPath(targetAbs);
+    let resultPaths = isError ? [] : search.program === 'ls' && !search.globOperand && ctx.targetKind(target) !== 'file'
+      ? lsPaths(resultText, search.multiple ? search.dir : targetAbs, search.dir) : outputPaths(resultText, search.dir, targetAbs);
+    if (!simple) resultPaths = resultPaths.filter(rel => fileSet.has(rel));
+    const exitCode = record.toolUseResult?.exitCode;
+    const noMatchExit = ['grep', 'rg'].includes(search.program) && simple && !search.listing
+      && (/^Exit code 1\s*$/i.test(resultText.trim()) || exitCode === 1 && !resultText.trim());
+    const empty = simple && !resultText.trim() && !isError && !record.toolUseResult?.interrupted
+      && (search.program === 'ls' || search.listing);
+    recordSearch(listing && !search.query ? 'list' : 'search', search.query, target, resultPaths,
+      outputParts(command) > 1 ? 'unknown' : noMatchExit ? 'empty' : isError || record.toolUseResult?.interrupted || exitCode > 0 ? 'failed'
+        : resultPaths.length ? 'matches' : empty ? 'empty' : 'unknown');
   };
 
   // Each subagent file is walked at most once. A subagent result can point back to a subagent
@@ -502,6 +649,7 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
   };
 
   walk(records, { name: 'main', message: undefined, parentEvent: () => null }, mainSources);
+  keepAnswer();
 
   for (const message of messages) if (message.firstEvent >= events.length) message.firstEvent = null;
   const times = records.map(record => record.timestamp).filter(value => typeof value === 'string').sort();
@@ -517,10 +665,10 @@ function parseSession({ sessionId, file, folder, worktree, entrypoint, records, 
   }
   totals.filesRead = readPaths.size;
   const report = {
-    sessionId, folder, worktree, entrypoint,
+    sessionId, folder, worktree, entrypoint, title: titleOf(records),
     startedAt: times[0] ?? null, endedAt: times.at(-1) ?? null,
     gitBranch: records.find(record => record.gitBranch)?.gitBranch ?? null,
-    startLoad, messages, events, compactions, usage, totals
+    startLoad, messages, answers, events, compactions, usage, totals, explorationCoverage: 'recorded'
   };
   return { report, memory: { messages: memoryMessages, startLoadText, eventText }, file };
 }
@@ -625,6 +773,15 @@ export function readSessions({ root, home, claudeSettingsHome, oldPaths = [], fi
   claudeSettingsHome = path.resolve(claudeSettingsHome);
   const knownRoots = [root, ...oldPaths.map(item => P.normalize(item).replace(/\/$/, ''))];
   const fileSet = new Set(files);
+  const targetKind = rel => {
+    if (!projectLocation(rel)) return 'unknown';
+    if (rel === '.') return 'folder';
+    if (fileSet.has(rel)) return 'file';
+    try {
+      const stat = statSync(path.join(root, rel));
+      return stat.isFile() ? 'file' : stat.isDirectory() ? 'folder' : 'unknown';
+    } catch { return 'unknown'; }
+  };
   const diskText = rel => (fileSet.has(rel) ? readText(path.join(root, rel)) : null);
   const display = abs => {
     if (abs.startsWith(`${claudeSettingsHome}/`)) return `~/.claude/${abs.slice(claudeSettingsHome.length + 1)}`;
@@ -656,7 +813,7 @@ export function readSessions({ root, home, claudeSettingsHome, oldPaths = [], fi
       const mapPath = pathMapper({ roots, home, claudeSettingsHome });
       const result = parseSession({ sessionId, file, folder: folder.name, worktree: folder.worktree,
         entrypoint: entrypoints.find(value => value !== 'sdk-cli') ?? null, records,
-        subagents: subagentsOf(folder.dir, sessionId), ctx: { mapPath, fileSet, home, diskText } });
+        subagents: subagentsOf(folder.dir, sessionId), ctx: { mapPath, fileSet, home, diskText, targetKind } });
       if (!result.report.totals.userMessages) {
         skipped.push({ folder: folder.name, file, reason: 'no-user-message' });
         continue;

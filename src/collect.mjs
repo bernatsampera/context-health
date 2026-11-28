@@ -82,7 +82,7 @@ export function frontmatter(text) {
 }
 
 // @ imports, outside code blocks and code spans, that point to an existing file.
-export function importsOf(text, file, ctx) {
+export function importsOf(text, file, ctx, fileExists = isFile) {
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
   const found = [];
   for (const match of prose.matchAll(/(?:^|\s)@((?:~\/|\.{1,2}\/|\/)?[\w.\-/]+[\w])/g)) {
@@ -90,7 +90,7 @@ export function importsOf(text, file, ctx) {
     const target = raw.startsWith('~/.claude/') ? path.join(ctx.claudeSettingsHome, raw.slice('~/.claude/'.length))
       : raw.startsWith('~/') ? path.join(ctx.home, raw.slice(2))
       : path.isAbsolute(raw) ? raw : path.resolve(path.dirname(file), raw);
-    if (isFile(target) && !found.includes(target)) found.push(target);
+    if (fileExists(target) && !found.includes(target)) found.push(target);
   }
   return found;
 }

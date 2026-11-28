@@ -88,7 +88,7 @@ export function run({ patches, label, open, out }) {
   mkdirSync(out, { recursive: true });
   const args = [path.join(repo, 'bin', 'context-health.mjs'), project,
     '--claude-settings-home', path.join(here, 'claude-home'), '--old-path', OLD,
-    '--intents', '--cache', path.join(work, 'cache'), '--out', out, '--config', CONFIG];
+    '--intents', '--cache', path.join(work, 'cache'), '--out', out, '--config', CONFIG, '--ignore', 'none'];
   if (!open) args.push('--no-open');
   const result = spawnSync(process.execPath, args, {
     encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: path.join(repo, 'test', 'fake-claude.mjs') }

@@ -161,7 +161,9 @@ function buildMapNodes({ model, mapFiles, used }) {
   const nodes = new Map();
   const add = node => { if (!nodes.has(node.id)) nodes.set(node.id, node); };
   const base = (id, rel, lane, column, steps, tokens) => ({ id, path: rel, lane, column, row: null, steps, tokens,
-    intents: used.intents.get(id)?.size || 0, groups: used.groups.get(id)?.size || 0 });
+    intents: used.intents.get(id)?.size || 0, groups: used.groups.get(id)?.size || 0,
+    usedBy: { groups: model.groups.list.map(group => group.id).filter(key => used.groups.get(id)?.has(key)),
+      sessions: model.sessions.list.map(session => session.sessionId).filter(key => used.sessions.get(id)?.has(key)) } });
   for (const item of model.startLoad) if (START_WHAT.has(item.what)) add(base(item.path, item.path, 'start', 0, 0, item.tokens));
   // Step 11: only the context files that can be a need are on the page map. A file that is out has no box.
   // Step 5 built the test for this model, so this step reads no file.
@@ -240,15 +242,17 @@ export function buildRoutes(model) {
   }
 
   // Heat: the distinct intents and groups that have a file on a route.
-  const used = { intents: new Map(), groups: new Map(), edges: new Map(), needPaths: new Set() };
+  const used = { intents: new Map(), groups: new Map(), sessions: new Map(), edges: new Map(), needPaths: new Set() };
   const mark = (map, id, value) => map.set(id, (map.get(id) || new Set()).add(value));
   for (const item of intents) {
     const k = keyOf(item.sessionId, item.intentId);
+    // One place for all 3 counts, so a box and the list of its sessions and intents agree.
+    const use = id => { mark(used.intents, id, k); mark(used.groups, id, item.groupId); mark(used.sessions, id, item.sessionId); };
     for (const need of item.needs) {
       used.needPaths.add(need.path);
       // Heat counts the files the agent showed it used: the need, and each file of the route that is not from the map.
-      for (const step of need.route) if (step.how !== 'map' || step.path === need.path) { mark(used.intents, step.path, k); mark(used.groups, step.path, item.groupId); }
-      if (need.route[0].how === 'trigger') { mark(used.intents, SKILL_LIST, k); mark(used.groups, SKILL_LIST, item.groupId); }
+      for (const step of need.route) if (step.how !== 'map' || step.path === need.path) use(step.path);
+      if (need.route[0].how === 'trigger') use(SKILL_LIST);
       for (const edge of edgesOf(need.route, searchFrom)) if (edge.kind === 'link' || edge.kind === 'trigger') mark(used.edges, `${edge.from}\u0000${edge.to}`, k);
     }
   }

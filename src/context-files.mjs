@@ -13,6 +13,7 @@
 // This module holds checks 1 to 6, the config file, and the test that says which path can be a need.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { ignoreTest } from './ignore.mjs';
 import { readMemory } from './memory.mjs';
 
 // A folder with one of these names, at any depth of the path. Names compare in lower case.
@@ -29,10 +30,11 @@ const USER_FOLDERS = new Set(['skills', 'commands', 'agents', 'rules']);
 // The class of a context file, in the order of the report.
 export const WHYS = ['config', 'start-load', 'instructions', 'claude-folder', 'root-doc', 'docs-folder', 'index', 'linked'];
 // The reason of a candidate that is out, in the order of the report. `user-other` is only for a file of ~/.claude/.
-export const REASONS = ['config-exclude', 'ignored', 'test', 'output', 'code-folder', 'not-linked'];
+export const REASONS = ['option', 'config-exclude', 'ignored', 'test', 'output', 'code-folder', 'not-linked'];
 export const USER_OTHER = 'user-other';
 // A short text for each reason, for the page.
 export const REASON_TEXT = {
+  option: 'The settings of this report ignore it',
   'config-exclude': 'The config file leaves it out',
   ignored: 'Git ignores it',
   test: 'It is in a test folder',
@@ -182,9 +184,11 @@ export function loadedFiles(model) {
 // - state `open`: the links decide (check 7). `why` is the reason when no context file names the file.
 // options: config (null or the object of readConfig), git (false: no file is ignored), listed (the paths that git lists),
 // start, auto and skills (see loadedFiles).
-export function contextRule({ config = null, git = true, listed = new Set(), start = new Set(), auto = new Set(), skills = [] }) {
+export function contextRule({ config = null, git = true, listed = new Set(), start = new Set(), auto = new Set(), skills = [], ignore = null }) {
   const { included, excluded } = globTests(config);
+  const ignored = ignoreTest(ignore);
   return rel => {
+    if (ignored(rel)) return { state: 'out', why: 'option' };
     const loaded = start.has(rel);
     const out = excluded(rel);
     if (out && !loaded) return { state: 'out', why: 'config-exclude' };
@@ -262,14 +266,17 @@ export function needTest(model) {
   const mapFiles = new Map((model.map?.files || []).map(file => [file.path, file]));
   const excluded = new Map((model.contextRules?.excluded || []).map(file => [file.path, file.reason]));
   const globs = globTests(model.contextRules?.config);
-  const memory = `${readMemory({ root: model.project.root, claudeSettingsHome: model.claudeSettingsHome }).display}/`;
+  const memory = model.ignore?.includes('user') ? null
+    : `${readMemory({ root: model.project.root, claudeSettingsHome: model.claudeSettingsHome }).display}/`;
   const startItems = new Set(model.startLoad.map(item => item.path));
-  const userNeed = rel => rel === '~/.claude/CLAUDE.md' || rel.startsWith(memory) || startItems.has(rel) ||
+  const userNeed = rel => rel === '~/.claude/CLAUDE.md' || (memory && rel.startsWith(memory)) || startItems.has(rel) ||
     rel.slice('~/.claude/'.length).split('/').slice(0, -1).some(name => USER_FOLDERS.has(name));
   // A project path that the map and the list of excluded files do not know: the file is not on disk now.
   const pathReason = rel => (globs.excluded(rel) ? 'config-exclude' : badFolder(rel));
+  const ignored = ignoreTest(model.ignore);
   const reasonOf = rel => {
     if (!wasNeedPath(rel)) return null;
+    if (ignored(rel)) return 'option';
     const file = mapFiles.get(rel);
     if (file) return file.context ? null : file.why;
     if (isUserPath(rel)) return userNeed(rel) ? null : USER_OTHER;

@@ -65,7 +65,7 @@ export function startPathsOf(model, session) {
 
 // ---------- file needs ----------
 
-function fileState({ need, events, startPaths }) {
+export function fileState({ need, events, startPaths }) {
   const first = need.firstEvent;
   // The text is in context when the start load has it, or an earlier read or load of the same path is in this thread.
   // A subagent starts with the start load and its own prompt only. It does not get the main conversation.
@@ -388,8 +388,9 @@ function readCache(file) {
 // ---------- main ----------
 
 // options: { allowCalls, model, cacheDir }
-export async function findNeeds({ model, memory, options }) {
-  const { allowCalls = false, model: modelName = 'sonnet', cacheDir } = options;
+// `keep`: a Map that gets the check of each session. `given`: such a Map. With it, the checks are not made again.
+export async function findNeeds({ model, memory, options, keep = null, given = null }) {
+  const { allowCalls = false, call = runClaude, model: modelName = 'sonnet', cacheDir } = options;
   const prompt = readFileSync(PROMPT_FILE, 'utf8');
   const folder = path.join(cacheDir, 'needs');
   const mapFiles = new Map((model.map?.files || []).map(file => [file.path, file]));
@@ -416,6 +417,7 @@ export async function findNeeds({ model, memory, options }) {
       .map(item => ({ ...item }));
     const item = { entry, session, intents, corrections, check: { status: 'not-needed', reason: null, costUsd: null }, results: null };
     if (!corrections.length) return item;
+    if (given) return Object.assign(item, given.get(entry.sessionId));
     today ??= todayFiles(model, test);
     Object.assign(item, checkInput({ sessionId: entry.sessionId, corrections, session, memo, model, today, test }));
     item.key = sha256(`${prompt}\n${modelName}\n${item.input}`);
@@ -425,7 +427,7 @@ export async function findNeeds({ model, memory, options }) {
 
   const pending = [];
   for (const item of items) {
-    if (!item.corrections.length) continue;
+    if (!item.corrections.length || given) continue;
     const parse = text => parseChecks(text, item.corrections, item.now);
     const cached = readCache(item.file);
     if (cached) {
@@ -447,7 +449,7 @@ export async function findNeeds({ model, memory, options }) {
     mkdirSync(folder, { recursive: true });
     console.log(`needs: ${pending.length} check calls (${modelName}), up to ${PARALLEL} at a time`);
     await mapLimit(pending, PARALLEL, async item => {
-      const result = await runClaude({ model: modelName, systemPrompt: prompt, input: item.input, parse: text => parseChecks(text, item.corrections, item.now) });
+      const result = await call({ model: modelName, systemPrompt: prompt, input: item.input, parse: text => parseChecks(text, item.corrections, item.now) });
       if (!result.ok) { item.check = { status: 'failed', reason: result.reason, costUsd: null }; return; }
       writeFileSync(item.file, `${JSON.stringify({ promptVersion: PROMPT_VERSION, model: modelName, sessionId: item.entry.sessionId,
         key: item.key, costUsd: result.costUsd, result: result.text, checked: result.value }, null, 2)}\n`);
@@ -456,6 +458,7 @@ export async function findNeeds({ model, memory, options }) {
     });
   }
 
+  if (keep) for (const item of items) keep.set(item.entry.sessionId, { check: item.check, results: item.results });
   const sessions = items.map(item => ({
     sessionId: item.entry.sessionId,
     check: item.check,
@@ -485,9 +488,9 @@ export async function findNeeds({ model, memory, options }) {
     })
   }));
   const waiting = sessions.filter(entry => entry.check.status === 'not-analysed').length;
-  if (waiting) console.log(`needs: ${waiting} sessions have a missing-context check that is not analysed. Run with --intents.`);
+  if (waiting && !given) console.log(`needs: ${waiting} sessions have a missing-context check that is not analysed. Run with --intents.`);
   const failed = sessions.filter(entry => entry.check.status === 'failed').length;
-  if (pending.length || failed) console.log(`needs: ${sessions.filter(entry => entry.check.status === 'ok').length} checks ok, ${failed} failed`);
+  if (!given && (pending.length || failed)) console.log(`needs: ${sessions.filter(entry => entry.check.status === 'ok').length} checks ok, ${failed} failed`);
   // The task facts of the run: session order, then intent, then correction.
   const taskList = sessions.flatMap(entry => entry.intents.flatMap(intent => intent.taskFacts.map(fact => (
     { sessionId: entry.sessionId, intentId: intent.intentId, correctionId: fact.correctionId, text: fact.text, quote: fact.quote }))));

@@ -124,7 +124,7 @@ const head = call => call.stdin.split('\n', 1)[0];
 const groupCalls = list => list.filter(call => head(call).startsWith('context-health intent-groups '));
 
 function run({ out, cache = cacheA, intents = true, extra = [], tz = 'UTC' }) {
-  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--no-save', ...extra];
+  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--ignore', 'none', '--no-save', ...extra];
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: tz, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
   const json = existsSync(path.join(out, 'report.json')) ? readFileSync(path.join(out, 'report.json'), 'utf8') : null;
@@ -170,7 +170,7 @@ test('the runs work, and the new keys come after needs, before score', () => {
   for (const r of [r1, r2, r3, r4, r5, r6]) assert.equal(r.status, 0, r.stderr);
   const keys = Object.keys(report);
   // Step 9 adds duplicates (before routes) and health (before prompt). Step 11 adds fixes (after health).
-  assert.deepEqual(keys.slice(keys.indexOf('needs')), ['needs', 'groups', 'duplicates', 'routes', 'health', 'fixes', 'prompt', 'score']);
+  assert.deepEqual(keys.slice(keys.indexOf('needs')), ['needs', 'groups', 'duplicates', 'analysis', 'routes', 'health', 'fixes', 'prompt', 'score']);
   assert.deepEqual(Object.keys(report.fixes), ['limit', 'total', 'list', 'smaller', 'left']);
   assert.deepEqual(Object.keys(report.groups), ['promptVersion', 'model', 'status', 'reason', 'costUsd', 'intents', 'list', 'notes']);
   assert.deepEqual(Object.keys(routes), ['method', 'metrics', 'map', 'intents', 'byGroup', 'bySession']);

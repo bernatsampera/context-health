@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -29,7 +30,7 @@ git('init', '-q');
 git('add', '-A');
 const statusBefore = git('status', '--porcelain', '--untracked-files=all', '--ignored');
 
-const run = out => execFileSync('node', [cli, project, '--claude-settings-home', claudeSettingsHome, '--out', out, '--no-open', '--no-save'], { encoding: 'utf8' });
+const run = out => execFileSync('node', [cli, project, '--claude-settings-home', claudeSettingsHome, '--out', out, '--no-open', '--ignore', 'none', '--no-save'], { encoding: 'utf8' });
 const firstOut = path.join(work, 'run-1');
 run(firstOut);
 const artifact = path.join(repo, 'out', 'e2e-indoeuromap');
@@ -81,18 +82,24 @@ test('F5: git-ignored files are not context files', () => {
   // a docs folder, and their name is not `index.md` (`not-linked`). Before, each listed Markdown file counted.
   assert.deepEqual(data, []);
   assert.deepEqual(model.contextRules.excluded.filter(file => file.path.startsWith('data/')),
-    [{ path: 'data/_index.data.md', reason: 'not-linked' }, { path: 'data/spain/madrid/_index.madrid.md', reason: 'not-linked' }]);
+    [
+      { path: 'data/_index.data.md', reason: 'not-linked' },
+      { path: 'data/research/europe-expansion-2026-10-20/README.md', reason: 'ignored' },
+      { path: 'data/research/growth-metrics-2026-10-21/README.md', reason: 'ignored' },
+      { path: 'data/research/wave-1-finish-2026-10-20/README.md', reason: 'ignored' },
+      { path: 'data/spain/madrid/_index.madrid.md', reason: 'not-linked' }
+    ]);
 });
 
 test('F6: the command writes nothing into the project', () => {
   assert.equal(git('status', '--porcelain', '--untracked-files=all', '--ignored'), statusBefore);
-  assert.throws(() => execFileSync('node', [cli, project, '--out', path.join(project, 'out'), '--no-open', '--no-save'],
+  assert.throws(() => execFileSync('node', [cli, project, '--out', path.join(project, 'out'), '--no-open', '--ignore', 'none', '--no-save'],
     { stdio: 'pipe' }), 'an output folder inside the project is refused');
 });
 
 test('F7: two runs give the same report', () => {
   assert.equal(readFileSync(path.join(firstOut, 'report.json'), 'utf8'), readFileSync(path.join(artifact, 'report.json'), 'utf8'));
-  assert.equal(readFileSync(path.join(firstOut, 'report.html'), 'utf8'), html);
+  assert.equal(withoutRunFolders(readFileSync(path.join(firstOut, 'report.html'), 'utf8')), withoutRunFolders(html));
 });
 
 test('the page has the header, the map of the context and the Copy markdown button', () => {
@@ -104,7 +111,7 @@ test('the page has the header, the map of the context and the Copy markdown butt
   // Step 9: the health block replaces the 3 metrics. With no sessions it has no count, and it says why.
   // Step 11: the block has 5 rows of counts. It has no `data-health`: the page does not show the score any more.
   // Step 12: the block is the score of method v1 again. With no sessions it shows "No data" and the reason, and no number.
-  assert.ok(html.includes('<section class="health" id="health" data-shown="no-data" data-method="v1" aria-label="Context score">'));
+  assert.ok(html.includes('<section class="health" id="health" data-shown="no-data" data-method="v3" aria-label="Context score">'));
   assert.ok(html.includes('<div class="hstate">No data<') && !html.includes('class="hscore"') && !html.includes('data-health='));
   assert.ok(html.includes('<p class="hreason">The tool found no session of this project.<') && !html.includes('data-metric='));
   const data = JSON.parse(html.match(/<script type="application\/json" id="page-data">([\s\S]*?)<\/script>/)[1]);

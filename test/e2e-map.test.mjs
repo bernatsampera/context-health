@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -33,7 +34,7 @@ git('init', '-q');
 git('add', '-A');
 const listed = git('ls-files', '-z').split('\0').filter(Boolean).sort();
 
-const run = out => execFileSync('node', [cli, project, '--claude-settings-home', claudeSettingsHome, '--out', out, '--no-open', '--no-save'], { encoding: 'utf8' });
+const run = out => execFileSync('node', [cli, project, '--claude-settings-home', claudeSettingsHome, '--out', out, '--no-open', '--ignore', 'none', '--no-save'], { encoding: 'utf8' });
 const firstOut = path.join(work, 'run-1');
 run(firstOut);
 const artifact = path.join(repo, 'out', 'e2e-map');
@@ -212,7 +213,7 @@ test('M12: skill and command bodies come by trigger; skills for other agents do 
 
 test('M14: two runs give the same report', () => {
   assert.equal(readFileSync(path.join(firstOut, 'report.json'), 'utf8'), readFileSync(path.join(artifact, 'report.json'), 'utf8'));
-  assert.equal(readFileSync(path.join(firstOut, 'report.html'), 'utf8'), html);
+  assert.equal(withoutRunFolders(readFileSync(path.join(firstOut, 'report.html'), 'utf8')), withoutRunFolders(html));
 });
 
 test('M15: the totals match the files', () => {

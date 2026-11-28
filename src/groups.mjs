@@ -80,7 +80,7 @@ function buildList(list, groups, order) {
 
 // options: { allowCalls, model, cacheDir }
 export async function findGroups({ model, options }) {
-  const { allowCalls = false, model: modelName = 'sonnet', cacheDir } = options;
+  const { allowCalls = false, call = runClaude, model: modelName = 'sonnet', cacheDir } = options;
   const prompt = readFileSync(PROMPT_FILE, 'utf8');
   const order = new Map(model.sessions.list.map((session, k) => [session.sessionId, k]));
   const list = sortedIntents(model.intents);
@@ -107,7 +107,7 @@ export async function findGroups({ model, options }) {
     return done('not-analysed', 'not analysed: run with --intents', null, alone());
   }
   console.log(`groups: 1 model call (${modelName}) for ${list.length} intents`);
-  const result = await runClaude({ model: modelName, systemPrompt: prompt, input, parse });
+  const result = await call({ model: modelName, systemPrompt: prompt, input, parse });
   if (!result.ok) {
     console.log(`groups: failed (${result.reason}). Each intent is its own group.`);
     return done('failed', result.reason, null, alone());

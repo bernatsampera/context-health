@@ -17,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit, withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -330,30 +331,31 @@ const twice = [];
 const CONFIG = path.join(work, 'config', 'context-files.json');
 write(CONFIG, `${JSON.stringify({ include: ['notes/**', 'guides/**', 'work/**', 'data/**'] }, null, 2)}\n`);
 // One run of the real command. With `again`, a second run with the same cache: both reports must be the same.
-function run(name, project, home, { old = true, intents = true, extra = [], again = false, out2 = null, cache = name } = {}) {
-  const once = out => {
-    const args = [cli, project, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--no-save', '--config', CONFIG, ...extra];
+function run(name, project, home, { old = true, intents = true, extra = [], again = false, out2 = null, cache = name, retryExit = 0 } = {}) {
+  const once = (out, exit = 0) => {
+    const args = [cli, project, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--ignore', 'none', '--no-save', '--config', CONFIG, ...extra];
     if (old) args.push('--old-path', OLD);
     if (intents) args.push('--intents');
     const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
-    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-    return { json: readFileSync(path.join(out, 'report.json'), 'utf8'), html: readFileSync(path.join(out, 'report.html'), 'utf8') };
+    const json = readFileSync(path.join(out, 'report.json'), 'utf8');
+    assertReportExit(result, JSON.parse(json), exit);
+    return { json, html: readFileSync(path.join(out, 'report.html'), 'utf8') };
   };
   const first = once(path.join(work, 'out', `${name}-1`));
   if (again) {
     if (out2) mkdirSync(out2, { recursive: true });
-    twice.push({ name, first, second: once(out2 || path.join(work, 'out', `${name}-2`)) });
+    twice.push({ name, first, second: once(out2 || path.join(work, 'out', `${name}-2`), retryExit) });
   }
   const result = { name, ...first, report: JSON.parse(first.json) };
   all.push(result);
   return result;
 }
 const artifact = path.join(repo, 'out', 'e2e-step-10-d');
-const main = run('main', M, HM, { again: true, out2: artifact });
-const agents = run('agents', N, HN, { again: true });
-const agentsOff = run('agents-off', N, HNOFF, { again: true });
-const bare = run('bare', BARE, HB, { again: true });
-const thin20 = run('thin-5-20', M, HT20, { again: true });
+const main = run('main', M, HM, { again: true, out2: artifact, retryExit: 2 });
+const agents = run('agents', N, HN, { again: true, retryExit: 2 });
+const agentsOff = run('agents-off', N, HNOFF, { again: true, retryExit: 2 });
+const bare = run('bare', BARE, HB, { again: true, retryExit: 2 });
+const thin20 = run('thin-5-20', M, HT20, { again: true, retryExit: 2 });
 const thin2of5 = run('thin-2-of-5', M, HT20, { extra: ['--sessions', '2'] });
 const thin19 = run('thin-5-19', M, HT19);
 const thin4 = run('thin-4-20', M, HT4);
@@ -364,7 +366,7 @@ const noSessions = run('no-sessions', M, HT19, { old: false, intents: false });
 const bigFailed = run('big-no-answer', BIG, HBIG, { cache: 'big' });
 const bigRunId = calls().map(call => call.stdin.split('\n', 1)[0]).filter(head => head.startsWith('context-health duplicates ')).at(-1).split(' ').at(-1);
 writeFileSync(path.join(fakeAnswers, `${bigRunId}.duplicates.json`), `${JSON.stringify({ total_cost_usd: 0.02, result: { facts: [] } })}\n`);
-const big = run('big', BIG, HBIG, { cache: 'big', again: true });
+const big = run('big', BIG, HBIG, { cache: 'big', again: true, retryExit: 2 });
 const after = {
   status: Object.fromEntries(Object.entries(projects).map(([name, dir]) => [name, statusOf(dir)])),
   files: Object.fromEntries(Object.entries({ ...projects, ...homes, repoSettings }).map(([name, dir]) => [name, snapshot(dir)]))
@@ -432,13 +434,14 @@ test('the runs work, and the folders above the temp folder have no instruction f
 
 test('G4: the keys of health, in their order', () => {
   // Step 11: the new key `fixes` is between `health` and `prompt`.
-  assert.deepEqual(Object.keys(R).slice(-8), ['needs', 'groups', 'duplicates', 'routes', 'health', 'fixes', 'prompt', 'score']);
+  assert.deepEqual(Object.keys(R).slice(-9), ['needs', 'groups', 'duplicates', 'analysis', 'routes', 'health', 'fixes', 'prompt', 'score']);
   for (const r of all) {
     const h = r.report.health;
     assert.deepEqual(Object.keys(h), ['method', 'weights', 'score', 'label', 'reason', 'parts', 'data', 'counts', 'v1'], r.name);
     // Step 11: the old keys stay, and `counts` is a new key. Step 12: `v1` is the new last key.
     assert.deepEqual(Object.keys(r.report.fixes), ['limit', 'total', 'list', 'smaller', 'left'], r.name);
-    for (const fix of allFixes(r.report)) assert.deepEqual(Object.keys(fix), ['id', 'kind', 'needs', 'files', 'target', 'line', 'text', 'question']); // step 12: `question`
+    for (const fix of allFixes(r.report)) assert.deepEqual(Object.keys(fix).filter(key => !['rule', 'editFiles'].includes(key)),
+      ['id', 'kind', 'needs', 'files', 'target', 'line', 'text', 'question', 'sessionIds', 'fingerprint']);
     assert.deepEqual(Object.keys(h.parts), ['found', 'close', 'oneSource']);
     assert.deepEqual(Object.keys(h.parts.found), ['score', 'counted', 'reached', 'answer', 'lost', 'told', 'root', 'saved']);
     assert.deepEqual(Object.keys(h.parts.close), ['score', 'counted', 'oneStep', 'answer', 'far', 'noRoute']);
@@ -707,7 +710,8 @@ test('R2, R3, R4, R5, R6, R9: AGENTS.md does not load, so the first fix is a CLA
   assert.ok(sectionOf(report, 6).includes('Keep the new CLAUDE.md small:'));
   // Step 12: the page shows the items of health.v1, not the old Found detail (test/e2e-step-12-b.test.mjs). The root fix
   // is under question find. The texts of the counts stay in report.json.
-  assert.ok(row(agentsOff.html, 'find').detail.includes(`<li data-fix="${report.fixes.list[0].id}" data-kind="root">`));
+  assert.ok(row(agentsOff.html, 'find').detail.includes(`href="#finding-${report.fixes.list[0].id}"`));
+  assert.ok(agentsOff.html.includes(`<li data-fix="${report.fixes.list[0].id}" data-kind="root">`));
   const counts = report.health.counts;
   assert.deepEqual([counts.noRoute.text, counts.noRoute.base, counts.told.text],
     ['5 needed files have no route', 'of 5 needed files', '1 fact you had to type (0 already saved)']);
@@ -745,7 +749,8 @@ test('R1, R8: with no CLAUDE.md and no AGENTS.md, the first fix is a new CLAUDE.
     assert.ok(values.some(value => value.includes('the new CLAUDE.md')));
   }
   // Step 12: the page shows the root fix under question find (the old detail of row a is gone).
-  assert.ok(row(bare.html, 'find').detail.includes('data-kind="root"'));
+  assert.ok(row(bare.html, 'find').detail.includes('href="#finding-x1"'));
+  assert.ok(bare.html.includes('<li data-fix="x1" data-kind="root">'));
   // R8: the tool does not write the file.
   for (const dir of [BARE, N]) assert.ok(!existsSync(path.join(dir, 'CLAUDE.md')));
 });
@@ -809,7 +814,7 @@ test('T1, T2, T3, T4, T5, T6, D17: the thin data line and the skipped files line
   for (const r of all) {
     assert.ok(!r.html.includes('data-skipped=') && !r.html.includes('class="hdata'), r.name);
     assert.deepEqual(dataLines(r.html), [], r.name);
-    assert.ok(r.html.includes(`<section class="health" id="health" data-shown="${r.report.health.v1.shown}" data-method="v1"`), r.name);
+    assert.ok(r.html.includes(`<section class="health" id="health" data-shown="${r.report.health.v1.shown}" data-method="v3"`), r.name);
   }
   // T3: the counts of the skipped files, in report.json and in the base detail of the page.
   assert.equal(thin19.report.health.counts.sessions.text, 'From 5 of 8 sessions (2 headless skipped, 1 with no user message)');
@@ -819,7 +824,7 @@ test('T1, T2, T3, T4, T5, T6, D17: the thin data line and the skipped files line
   const sessionsOf = r => { const s = r.report.health.counts.sessions; return [s.analysed, s.total, s.read, s.notAnalysed, s.headless, s.noUserMessage, s.other]; };
   assert.deepEqual([thin19, thin20, thin2of5, notAnalysed, noSessions].map(sessionsOf), [[5, 8, 5, 0, 2, 1, 0], [5, 5, 5, 0, 0, 0, 0], [2, 5, 5, 3, 0, 0, 0], [0, 8, 5, 5, 2, 1, 0], [0, 0, 0, 0, 0, 0, 0]]);
   // T4: no data: the number area says "No data" with one reason line. The texts of the counts stay in report.json.
-  assert.ok(notAnalysed.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v1"'));
+  assert.ok(notAnalysed.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v3"'));
   assert.equal(notAnalysed.html.split('<p class="hreason"').length, 2);
   assert.equal(notAnalysed.report.health.counts.sessions.text, 'From 0 of 8 sessions (2 headless skipped, 1 with no user message, 5 not analysed)');
   assert.equal(notAnalysed.report.health.counts.noRoute.text, 'Needed files with no route: no data');
@@ -878,7 +883,7 @@ test('G1, G2, G3, F12: the same files on each run, no change in the projects and
   assert.deepEqual(twice.map(item => item.name), ['main', 'agents', 'agents-off', 'bare', 'thin-5-20', 'big']);
   for (const item of twice) {
     assert.equal(item.second.json, item.first.json, `${item.name}: report.json`);
-    assert.equal(item.second.html, item.first.html, `${item.name}: report.html`);
+    assert.equal(withoutRunFolders(item.second.html), withoutRunFolders(item.first.html), `${item.name}: report.html`);
   }
   // G2: the tool writes nothing into a project or a settings home.
   assert.deepEqual(after, before);

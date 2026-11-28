@@ -12,6 +12,7 @@ import path from 'node:path';
 import { START_WHAT, collect } from './collect.mjs';
 import { isCandidate } from './context-files.mjs';
 import { weakWayOf } from './found.mjs';
+import { ignoreStart } from './ignore.mjs';
 import { buildMap } from './map.mjs';
 import { PROOF_LIMITS, PROOF_NOTES, gradeOf } from './score-v1.mjs';
 
@@ -87,7 +88,7 @@ function commitFiles({ git, cacheDir, sha }) {
 
 // The map of the context at a commit: { mapFiles, startPaths }.
 function oldMapOf({ model, root, home, claudeSettingsHome, config, tree, files }) {
-  const old = collect({ root: tree, home, claudeSettingsHome, config, listing: { method: 'git', files }, realRoot: root });
+  const old = ignoreStart(collect({ root: tree, home, claudeSettingsHome, config, listing: { method: 'git', files }, realRoot: root }), { ignore: model.ignore, root, home });
   const built = buildMap({ root: tree, model: old, files, sessions: model.sessions, config, memoryRoot: root });
   return { mapFiles: new Map(built.map.files.map(file => [file.path, file])),
     startPaths: new Set(old.startLoad.filter(item => START_WHAT.has(item.what)).map(item => item.path)) };

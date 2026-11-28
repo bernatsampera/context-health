@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Context map · bjjgym</title>
+<style>
+:root {
+  color-scheme: light;
+  --ink: #18392e; --muted: #5d6c65; --line: #c5cec7; --paper: #fbfcf9;
+  --green: #176047; --amber: #865921; --rose: #944437; --blue: #486b99;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--ink); background: var(--paper); font: 15px/1.45 Inter, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 1260px; padding: clamp(18px, 4vw, 58px); margin: auto; }
+header, .title-group, .controls, .scope-top, .region-title, .file-name, .legend { display: flex; align-items: center; }
+header { justify-content: space-between; flex-wrap: wrap; gap: 18px; margin-bottom: 22px; }
+.title-group, .controls { flex-wrap: wrap; gap: 8px 15px; }
+h1 { font-size: clamp(25px, 3.2vw, 37px); font-weight: 650; line-height: 1.12; letter-spacing: -.055em; margin: 0; }
+.project { color: var(--muted); font-size: 13px; }
+.controls { gap: 8px; }
+.controls label { font-size: 13px; color: var(--muted); }
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, select:focus-visible { outline: 3px solid #4678ba; outline-offset: 3px; }
+.controls select, .controls button { min-height: 37px; border: 1px solid #cbd4cc; border-radius: 7px; background: white; padding: 6px 10px; font-size: 13px; }
+.controls button:hover, .controls select:hover { background: #f2f5ef; }
+.controls button:disabled { opacity: .45; cursor: default; }
+.board { position: relative; isolation: isolate; border: 1px solid #cbd4cc; border-radius: 16px; background: #f2f5ef; }
+.terrain { position: relative; display: grid; grid-template-columns: minmax(112px, .75fr) minmax(0, 4.2fr); gap: clamp(18px, 2.4vw, 38px); align-items: center; padding: clamp(17px, 3vw, 40px); min-height: 400px; background-image: radial-gradient(#cdd6cf 0.8px, transparent 0.8px); background-size: 15px 15px; border-radius: 16px 16px 0 0; }
+canvas { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.region { border: 1px solid #becbc0; border-radius: 13px; min-width: 0; background: #fafcf8; }
+.docs { padding: clamp(12px, 2vw, 25px); }
+.doc-body { display: grid; grid-template-columns: minmax(110px, .85fr) minmax(0, 2.65fr); gap: clamp(17px, 2vw, 30px); align-items: center; }
+.subgroups, .doc-files { display: grid; gap: 14px; min-width: 0; }
+.group { background: #fff; padding: clamp(12px, 1.45vw, 20px); }
+.region.explored { border-color: #be9957; background-color: #fcfaf3; }
+.scope-top { flex-wrap: wrap; gap: 5px 12px; margin-bottom: 16px; }
+.region-title { gap: 8px; position: relative; z-index: 2; border: 0; border-radius: 4px; background: none; padding: 3px 1px; text-align: left; flex-wrap: wrap; }
+.folder-name { font: 600 14px var(--mono); }
+.folder-icon { width: 16px; height: 11px; margin-top: 2px; background: #e2e9dd; border: 1.5px solid #788b79; border-radius: 2px; position: relative; }
+.folder-icon::before { content: ""; position: absolute; left: -1.5px; top: -4px; width: 7px; height: 4px; border: 1.5px solid #788b79; border-bottom: 0; border-radius: 2px 2px 0 0; background: #e2e9dd; }
+.folder-state, .file-state { font: 600 12px/1.4 Inter, system-ui, sans-serif; }
+.folder-state { color: var(--amber); display: inline-flex; align-items: center; gap: 5px; }
+.empty { color: var(--rose); }
+.folder-state:not(:empty)::before { content: ""; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+.empty:not(:empty)::before { border-radius: 0; width: 7px; height: 2px; }
+.files { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.file { justify-self: stretch; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; position: relative; z-index: 2; min-width: 0; min-height: 62px; border: 1px solid #cbd5ce; border-radius: 8px; background: #fff; padding: 10px 11px; text-align: left; }
+.file-name { gap: 7px; max-width: 100%; overflow-wrap: anywhere; font: 500 13px/1.35 var(--mono); }
+.file-name::before { content: ""; flex: 0 0 8px; height: 11px; border: 1.3px solid currentColor; border-radius: 1.5px; opacity: .6; }
+.file-state { color: var(--amber); }
+.file-state:not(:empty) { margin: 4px 0 0 16px; }
+.file[data-state="listed"], .file[data-state="matched"] { border: 1.5px dashed #a98040; background: #fffaf0; }
+.file[data-state="opened"] { background: #195f46; color: white; border-color: #195f46; }
+.file[data-state="opened"] .file-state { color: #e4f6ea; }
+.file[data-state="opened"] .file-name { font-weight: 650; }
+.file[data-old] { border-style: dashed; }
+.file:hover, .region-title:hover { box-shadow: 0 0 0 2px #95a99c66; }
+.touched { outline: 3px solid #c9a059; outline-offset: 3px; }
+.file[data-state="opened"].touched { outline-color: #66aa89; }
+[data-path][aria-expanded="true"] { outline: 2px solid var(--blue); outline-offset: 3px; }
+.legend { flex-wrap: wrap; gap: 6px 20px; min-height: 44px; padding: 10px 20px; border-top: 1px solid #dce2da; color: var(--muted); background: #fbfcf9; font-size: 12px; border-radius: 0 0 16px 16px; }
+.legend:not(:has(> :not([hidden]))) { display: none; }
+.key { display: inline-flex; gap: 6px; align-items: center; }
+.key::before { content: ""; width: 10px; height: 7px; border-radius: 2px; }
+.key.discovery::before { width: 17px; height: 0; border-top: 2px dotted #986d31; border-radius: 0; }
+.key.link::before { width: 17px; height: 0; border-top: 1.5px solid var(--blue); border-radius: 0; }
+#detail { position: absolute; z-index: 5; width: min(310px, calc(100% - 16px)); border: 1px solid #aebeb1; border-radius: 10px; background: #fff; padding: 13px 15px; box-shadow: 0 8px 25px #19332720; font-size: 13px; }
+#detail strong { display: block; margin-right: 20px; overflow-wrap: anywhere; font: 600 13px var(--mono); }
+#detail p { margin: 8px 0 0; overflow-wrap: anywhere; }
+#detail code { color: #4e5c53; font: 12px var(--mono); }
+#close { float: right; background: transparent; border: 0; padding: 0 4px; font-size: 18px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media(max-width: 900px) {
+  .terrain { grid-template-columns: 1fr; }
+  .terrain > .file { justify-self: start; min-width: 135px; }
+}
+@media(max-width: 660px) {
+  main { padding: 18px 12px; }
+  .terrain { padding: 14px; gap: 15px; }
+  .doc-body { grid-template-columns: 1fr; }
+  .doc-files { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .scope-top { margin-bottom: 10px; }
+  .group { padding: 11px; }
+  .file { padding: 8px; }
+  .file-name { font-size: 12px; }
+  .files { gap: 7px; }
+  .legend { padding: 10px 12px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="title-group"><h1>Context map</h1><span class="project">bjjgym · Version 4 · Sample data</span></div>
+    <div class="controls">
+      <label for="session">Session</label>
+      <select id="session">
+        <option value="release">Cut a release</option>
+        <option value="older">Earlier session · Version 2</option>
+        <option value="structure">Files and references</option>
+      </select>
+      <button type="button" id="replay">Replay</button>
+    </div>
+  </header>
+  <section class="board" aria-label="Version 4 context map">
+    <div class="terrain" id="terrain">
+      <canvas id="lines" aria-hidden="true"></canvas>
+      <div id="root-file"></div>
+      <section class="docs region" data-folder="docs/" aria-label="docs folder">
+        <div class="scope-top"></div>
+        <div class="doc-body">
+          <div class="doc-files" id="doc-files"></div>
+          <div class="subgroups">
+            <section class="group region" data-folder="docs/how-to/" aria-label="how-to folder">
+              <div class="scope-top"></div><div class="files"></div>
+            </section>
+            <section class="group region" data-folder="docs/reference/" aria-label="reference folder">
+              <div class="scope-top"></div><div class="files"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="legend">
+      <span id="activity-key" class="key discovery">Folder lookup → result</span>
+      <span id="ref-key" class="key link" hidden>File reference</span>
+      <span id="coverage" hidden>Only file reads were recorded in this session.</span>
+    </div>
+    <aside id="detail" hidden aria-label="Map item details">
+      <button id="close" aria-label="Close details">×</button>
+      <strong id="detail-path"></strong><div id="detail-body"></div>
+    </aside>
+  </section>
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</main>
+<script>
+const $ = selector => document.querySelector(selector);
+const guideDir = 'docs/how-to/';
+const release = guideDir + 'release.md';
+const versioning = 'docs/reference/versioning.md';
+const archivedPath = 'docs/release.md';
+const sessions = {
+  release: [
+    {type: 'list', path: guideDir, hits: [guideDir + 'index.md', release], command: 'ls docs/how-to/'},
+    {type: 'search', path: guideDir, hits: [], command: 'grep -ri changelog docs/how-to/'},
+    {type: 'search', path: 'docs/', hits: [release, versioning], command: 'rg -l version docs/'},
+    {type: 'read', path: release, command: 'Read docs/how-to/release.md'}
+  ],
+  older: [
+    {type: 'read', path: 'CLAUDE.md', command: 'Read CLAUDE.md'},
+    {type: 'read', path: archivedPath, command: 'Read docs/release.md'},
+    {type: 'read', path: versioning, command: 'Read docs/reference/versioning.md'}
+  ],
+  structure: []
+};
+const references = [
+  ['CLAUDE.md', 'docs/index.md'],
+  ['docs/index.md', guideDir + 'index.md'],
+  ['docs/index.md', versioning],
+  [guideDir + 'index.md', release],
+  [release, versioning]
+];
+const buttons = new Map();
+let selected = null;
+let timer = null;
+let count = sessions.release.length;
+
+function itemButton(path, folder = false) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.path = path;
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-controls', 'detail');
+  button.className = folder ? 'region-title' : 'file';
+  const name = path.split('/').filter(Boolean).at(-1);
+  if (folder) {
+    button.innerHTML = '<i class="folder-icon" aria-hidden="true"></i><span class="folder-name"></span><span class="folder-state"></span><span class="folder-state empty"></span>';
+    button.querySelector('.folder-name').textContent = name + '/';
+  } else {
+    button.innerHTML = '<span class="file-name"></span><span class="file-state"></span>';
+    button.querySelector('.file-name').textContent = name;
+  }
+  buttons.set(path, button);
+  return button;
+}
+
+$('#root-file').replaceWith(itemButton('CLAUDE.md'));
+$('#doc-files').append(itemButton('docs/index.md'), itemButton(archivedPath));
+buttons.get(archivedPath).dataset.old = 'true';
+for (const section of document.querySelectorAll('[data-folder]')) {
+  const folder = section.dataset.folder;
+  section.querySelector('.scope-top').append(itemButton(folder, true));
+  if (folder === guideDir) section.querySelector('.files').append(itemButton(guideDir + 'index.md'), itemButton(release));
+  if (folder === 'docs/reference/') section.querySelector('.files').append(itemButton(versioning));
+}
+
+function events() { return sessions[$('#session').value]; }
+function describe(event) {
+  if (event.type === 'read') return 'Opened ' + event.path;
+  if (event.type === 'list') return 'Listed ' + event.path;
+  return 'Searched ' + event.path + (event.hits.length ? ', ' + event.hits.length + ' matches' : ', no matches');
+}
+
+function render() {
+  const visible = events().slice(0, count);
+  const latest = timer !== null ? visible.at(-1) : null;
+  const older = $('#session').value === 'older';
+  for (const [path, button] of buttons) {
+    const here = visible.filter(event => event.path === path);
+    let info;
+    if (path.endsWith('/')) {
+      const listed = here.some(event => event.type === 'list');
+      const found = here.some(event => event.type === 'search' && event.hits.length);
+      const misses = here.filter(event => event.type === 'search' && event.hits.length === 0).length;
+      const activity = [listed && 'Listed', found && 'Searched'].filter(Boolean).join(' · ');
+      const empty = misses ? (misses === 1 ? '1 empty search' : misses + ' empty searches') : '';
+      button.querySelector('.folder-state').textContent = activity;
+      button.querySelector('.empty').textContent = empty;
+      button.closest('.region').classList.toggle('explored', here.length > 0);
+      info = [activity, empty].filter(Boolean).join(', ');
+    } else {
+      const opened = here.some(event => event.type === 'read');
+      const discoveries = visible.filter(event => event.hits?.includes(path));
+      const matched = discoveries.some(event => event.type === 'search');
+      const state = opened ? 'opened' : matched ? 'matched' : discoveries.length ? 'listed' : '';
+      button.dataset.state = state;
+      info = {opened:'Opened', matched:'Matched', listed:'Listed', '':''}[state];
+      if (path === archivedPath) {
+        button.hidden = !opened;
+        info = 'Opened · Old path';
+      }
+      button.querySelector('.file-state').textContent = info;
+    }
+    button.setAttribute('aria-label', [path, info].filter(Boolean).join(', '));
+    button.classList.toggle('touched', latest?.path === path);
+    button.setAttribute('aria-expanded', String(selected === path));
+  }
+  const structure = $('#session').value === 'structure';
+  $('#activity-key').hidden = !lookupEvents().length;
+  $('#ref-key').hidden = !(selected && !selected.endsWith('/') && selected !== archivedPath);
+  $('#coverage').hidden = !older;
+  $('#replay').hidden = structure;
+  $('#replay').textContent = timer !== null ? 'End replay' : count < events().length ? 'Show whole session' : 'Replay';
+  drawLines();
+}
+
+function lookupEvents() {
+  if (!selected) return [];
+  return events().slice(0, count).filter(event => event.hits?.length &&
+    (selected === event.path || event.hits.includes(selected)));
+}
+
+function drawLines() {
+  const board = $('#terrain');
+  const area = board.getBoundingClientRect();
+  if (!area.width || !area.height) return;
+  const canvas = $('#lines');
+  const density = window.devicePixelRatio || 1;
+  canvas.width = Math.round(area.width * density);
+  canvas.height = Math.round(area.height * density);
+  canvas.style.width = area.width + 'px';
+  canvas.style.height = area.height + 'px';
+  const pen = canvas.getContext('2d');
+  if (!pen) return;
+  pen.scale(density, density);
+  pen.strokeStyle = '#a68147';
+  pen.lineWidth = 1.5;
+  pen.setLineDash([2, 5]);
+  for (const event of lookupEvents()) {
+    const source = buttons.get(event.path).getBoundingClientRect();
+    for (const hit of event.hits) {
+      if (selected !== event.path && selected !== hit) continue;
+      const target = buttons.get(hit).getBoundingClientRect();
+      const x1 = source.left + source.width / 2 - area.left;
+      const y1 = source.bottom - area.top;
+      const x2 = target.left + target.width / 2 - area.left;
+      const y2 = target.top - area.top;
+      const mid = y1 + (y2 - y1) / 2;
+      pen.beginPath();
+      pen.moveTo(x1, y1);
+      pen.bezierCurveTo(x1, mid, x2, mid, x2, y2);
+      pen.stroke();
+    }
+  }
+  pen.setLineDash([]);
+  // A solid arrow always means one saved file references another.
+  for (const [from, to] of references) {
+    const inspect = selected === from || selected === to;
+    if (!inspect) continue;
+    const a = buttons.get(from).getBoundingClientRect();
+    const b = buttons.get(to).getBoundingClientRect();
+    const sideways = b.left - a.right > 2;
+    const x1 = (sideways ? a.right : a.left + a.width / 2) - area.left;
+    const y1 = (sideways ? a.top + a.height / 2 : a.bottom) - area.top;
+    const x2 = (sideways ? b.left : b.left + b.width / 2) - area.left;
+    const y2 = (sideways ? b.top + b.height / 2 : b.top) - area.top;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    pen.strokeStyle = inspect ? '#486b99' : '#899bb0';
+    pen.fillStyle = pen.strokeStyle;
+    pen.lineWidth = inspect ? 2 : 1.5;
+    pen.beginPath();
+    pen.moveTo(x1, y1);
+    pen.bezierCurveTo(sideways ? mx : x1, sideways ? y1 : my, sideways ? mx : x2, sideways ? y2 : my, x2, y2);
+    pen.stroke();
+    const angle = sideways ? 0 : Math.PI / 2;
+    pen.beginPath();
+    pen.moveTo(x2, y2);
+    pen.lineTo(x2 - 6 * Math.cos(angle - .5), y2 - 6 * Math.sin(angle - .5));
+    pen.lineTo(x2 - 6 * Math.cos(angle + .5), y2 - 6 * Math.sin(angle + .5));
+    pen.fill();
+  }
+}
+
+function closeDetail(returnFocus = false) {
+  const previous = buttons.get(selected);
+  selected = null;
+  $('#detail').hidden = true;
+  if (returnFocus) previous?.focus();
+}
+function note(text, code = false) {
+  const p = document.createElement('p');
+  const content = code ? document.createElement('code') : p;
+  content.textContent = text;
+  if (code) p.append(content);
+  $('#detail-body').append(p);
+}
+function positionDetail() {
+  if (!selected) return;
+  const anchor = buttons.get(selected).getBoundingClientRect();
+  const bounds = $('.board').getBoundingClientRect();
+  const detail = $('#detail');
+  detail.style.left = Math.max(8, Math.min(anchor.left - bounds.left, bounds.width - detail.offsetWidth - 8)) + 'px';
+  const below = anchor.bottom - bounds.top + 6;
+  const above = anchor.top - bounds.top - detail.offsetHeight - 6;
+  detail.style.top = (below + detail.offsetHeight > bounds.height && above >= 6 ? above : below) + 'px';
+}
+function inspect(path) {
+  if (selected === path) { closeDetail(); render(); return; }
+  if (timer !== null) stopReplay(false);
+  selected = path;
+  $('#detail-path').textContent = path;
+  $('#detail-body').replaceChildren();
+  const recorded = events().slice(0, count).filter(event => event.path === path || event.hits?.includes(path));
+  for (const event of recorded) note(event.command + (event.hits?.length === 0 ? ' (no matches)' : ''), true);
+  if (path === archivedPath) note('This path was present in version 2.');
+  const outgoing = references.filter(([from]) => from === path).map(([,to]) => to);
+  const incoming = references.filter(([,to]) => to === path).map(([from]) => from);
+  if (outgoing.length) note('Links to ' + outgoing.join(', '));
+  if (incoming.length) note('Linked from ' + incoming.join(', '));
+  if (!$('#detail-body').childElementCount) note(path.endsWith('/') ? 'Folder in version 4.' : 'File in version 4.');
+  $('#detail').hidden = false;
+  render();
+  positionDetail();
+}
+
+function stopReplay(showAll = true) {
+  clearInterval(timer);
+  timer = null;
+  if (showAll) count = events().length;
+}
+function finishReplay() {
+  stopReplay();
+  $('#announce').textContent = 'Whole session shown.';
+  render();
+}
+$('#replay').addEventListener('click', () => {
+  closeDetail();
+  if (timer !== null || count < events().length) { finishReplay(); return; }
+  count = 1;
+  $('#announce').textContent = describe(events()[0]);
+  timer = setInterval(() => {
+    if (count >= events().length) { finishReplay(); return; }
+    count++;
+    $('#announce').textContent = describe(events()[count - 1]);
+    render();
+  }, 1450);
+  render();
+});
+$('#session').addEventListener('change', () => {
+  closeDetail();
+  stopReplay();
+  $('#announce').textContent = $('#session').selectedOptions[0].textContent;
+  render();
+});
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-path]');
+  if (button) {
+    inspect(button.dataset.path);
+    if (selected && event.detail === 0) $('#close').focus();
+    return;
+  }
+  if (event.target.closest('#detail') && !event.target.closest('#close')) return;
+  if (selected) { closeDetail(Boolean(event.target.closest('#close'))); render(); }
+});
+document.addEventListener('keydown', event => {
+  if (selected && event.key === 'Escape') { closeDetail(true); render(); }
+});
+window.addEventListener('resize', () => { drawLines(); positionDetail(); });
+if ('ResizeObserver' in window) new ResizeObserver(() => { drawLines(); positionDetail(); }).observe($('#terrain'));
+render();
+</script>
+</body>
+</html>

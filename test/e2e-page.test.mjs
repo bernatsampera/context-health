@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit, withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -84,7 +85,7 @@ writeFileSync(log, '');
 const cacheA = path.join(work, 'cache-a');
 
 function run({ out, cache = cacheA, intents = true, oldPath = true, tz = 'UTC', where = { project, settings } }) {
-  const args = [cli, where.project, '--claude-settings-home', where.settings, '--out', out, '--cache', cache, '--no-open', '--no-save'];
+  const args = [cli, where.project, '--claude-settings-home', where.settings, '--out', out, '--cache', cache, '--no-open', '--ignore', 'none', '--no-save'];
   if (oldPath) args.push('--old-path', OLD);
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8',
@@ -128,7 +129,8 @@ const rowsOf = page => healthOf(page).split('<div class="qrow" ').slice(1).map(p
 });
 
 test('the runs work', () => {
-  for (const r of [r1, r2, r3, r4, r5]) assert.equal(r.status, 0, r.stderr);
+  for (const r of [r1, r3, r4]) assertReportExit(r, r.report, 0);
+  for (const r of [r2, r5]) assertReportExit(r, r.report, 2);
   assert.equal(report.intents.sessions.find(entry => entry.sessionId === P1).status, 'ok');
   assert.equal(report.intents.sessions.find(entry => entry.sessionId === P2).status, 'failed');
   assert.equal(report.groups.status, 'ok');
@@ -145,7 +147,7 @@ test('V1, H1, H3, P1, P4: the 5 rows of counts, each detail closed, and the page
   assert.deepEqual([h.score, h.label, h.parts.found.score, h.parts.close.score, h.parts.oneSource.score], [64, 'mixed', 73, 41, 78]);
   // Step 12: the page shows the v1 score (health.v1) and its 4 questions. The step 9 score stays in report.json only.
   const v1 = h.v1;
-  assert.ok(html.includes(`<section class="health" id="health" data-shown="${v1.shown}" data-method="v1" aria-label="Context score">`));
+  assert.ok(html.includes(`<section class="health" id="health" data-shown="${v1.shown}" data-method="v3" aria-label="Context score">`));
   for (const old of ['data-health', 'data-label', 'class="hrow"', 'data-part', 'class="crow"', 'data-count=', 'class="hl ', 'class="ans ']) assert.ok(!html.includes(old), old);
   // The 5 rows, in order, with the text of health.counts. Each button is closed and each detail is hidden (the row parser checks it).
   // The needed files: frontend/CLAUDE.md, DESIGN.md, the city-batch skill, unslop, METHOD.md, compare.md, the tiktok orphan, direction.md: 8.
@@ -172,11 +174,11 @@ test('V1, H1, H3, P1, P4: the 5 rows of counts, each detail closed, and the page
   assert.deepEqual(h.parts.close.far.map(item => [item.path, item.uses, item.steps]), [
     ['frontend/DESIGN.md', 2, 2], ['second-iteration/decisions/compare.md', 1, 3], ['second-iteration/direction.md', 1, 3],
     ['frontend/CLAUDE.md', 1, 2], ['pipeline/METHOD.md', 1, 2]]);
-  // Step 12: each fix of report.fixes is on the page one time, under its question (so the order is by question).
+  // Each fix appears once, in rank order.
   const fixes = report.fixes;
   assert.ok(fixes.list.length > 0);
   assert.ok(html.includes(`<section class="fixes" id="fixes" data-fixes="${fixes.list.length}" data-smaller="${fixes.smaller.length}"`));
-  assert.deepEqual([...html.matchAll(/<li data-fix="(x\d+)" data-kind="([\w-]+)">/g)].map(m => [m[1], m[2]]).sort(), [...fixes.list, ...fixes.smaller].map(fix => [fix.id, fix.kind]).sort());
+  assert.deepEqual([...html.matchAll(/<li data-fix="(x\d+)" data-kind="([\w-]+)">/g)].map(m => [m[1], m[2]]), [...fixes.list, ...fixes.smaller].map(fix => [fix.id, fix.kind]));
   // P4: the old metrics are not on the page. They stay in report.json.
   assert.ok(!html.includes('data-metric=') && !html.includes('Direct reach') && !html.includes('Told by user</div>'));
   assert.deepEqual(report.routes.metrics, { directReach: { percent: 45, direct: 5, counted: 11 }, averageRoute: { steps: 2, needs: 8 }, toldByUser: { count: 2 } });
@@ -185,7 +187,7 @@ test('V1, H1, H3, P1, P4: the 5 rows of counts, each detail closed, and the page
     const counts = r.report.health.counts;
     assert.deepEqual([r.report.health.score, counts.reason], [null, reason]);
     // Step 12: the number area says "No data" with one reason line. The questions find, close and told have no list.
-    assert.ok(r.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v1"'), reason);
+    assert.ok(r.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v3"'), reason);
     const rows = rowsOf(r.html);
     assert.deepEqual(rows.map(item => item.key), KEYS, reason);
     for (const key of ['noRoute', 'searched', 'told']) {
@@ -201,9 +203,10 @@ test('V1, H1, H3, P1, P4: the 5 rows of counts, each detail closed, and the page
     assert.ok(r.html.includes('<p class="nofix">No fix from this data.</p>'), reason);
     assert.deepEqual([r.report.fixes.total, r.report.fixes.list, r.report.fixes.smaller], [0, [], []]);
   }
-  // The number shows in each state with a score. A thin or not proven state adds a note with its reason under the number.
-  assert.ok(html.includes('class="hscore"'), 'the number shows');
-  assert.equal(html.includes('class="hreason hnote"'), v1.shown !== 'score', 'the note is there only when the state is not "score"');
+  const area = healthOf(html);
+  assert.equal(area.includes('class="hscore"'), v1.shown === 'score', 'only a proven score is the headline');
+  assert.equal(area.includes(`Provisional estimate: ${v1.score}/100`), v1.shown !== 'score');
+  assert.match(area, /id="about"[^>]*><summary>How this score is made<\/summary>/);
   assert.ok(!html.includes('NaN') && !r3.html.includes('NaN') && !r4.html.includes('NaN'));
 });
 
@@ -270,30 +273,36 @@ test('V6: the full path of a project file and of a ~/.claude/ file', () => {
   // report.json keeps relative paths in the new keys. The page holds the two roots of the run, so a copy in another
   // folder gives the same page after the roots are replaced.
   const norm = (page, where) => page.replaceAll(where.project, '<project>').replaceAll(where.settings, '<settings>');
-  assert.equal(norm(r5.html, copy2), norm(html, { project, settings }));
+  assert.equal(norm(withoutRunFolders(r5.html), copy2), norm(withoutRunFolders(html), { project, settings }));
   assert.equal(norm(r5.json, copy2), norm(r1.json, { project, settings }));
 });
 
 test('V7: the 3 states', () => {
   // No sessions.
   assert.equal(r4.report.sessions.list.length, 0);
-  assert.ok(r4.html.includes('data-state="no-sessions">No sessions for this project.'));
-  assert.ok(r4.html.includes('add <code>--old-path &lt;old folder&gt;</code>'));
+  assert.match(r4.html, /data-state="no-sessions"><p>.*context files found.*No sessions found/);
+  assert.match(r4.html, /<code id="old-path-cmd">[^<]* --no-calls --old-path &quot;\/path\/to\/previous\/project&quot;/);
   assert.deepEqual([dataOf(r4.html).sessions, dataOf(r4.html).groups], [[], []]);
   // Sessions, but none analysed.
-  assert.match(r3.html, /data-state="not-analysed">No session is analysed yet\. Run with <code>--intents<\/code> to find the intents \(one model call for each session, sonnet\)\. 4 sessions wait for it\./);
+  assert.match(r3.html, /data-state="not-analysed"><p>.*4 sessions ready to analyse\./);
+  assert.match(r3.html, /<summary>Analyse 4 sessions<\/summary><div class="cmd"><code id="rerun">node /);
+  const command = r3.html.match(/<code id="rerun">([^<]+)<\/code>/)[1];
+  for (const flag of ['--out', '--old-path', '--claude-settings-home', '--cache', '--no-save']) assert.ok(command.includes(flag), flag);
   assert.deepEqual(dataOf(r3.html).groups, []);
   assert.equal(dataOf(r3.html).sessions.length, 6);
   // Analysed.
-  assert.ok(!html.includes('data-state='), 'no state line when all selected sessions are analysed or failed');
+  assert.match(html, /data-state="failed"><p>3 sessions analysed\. 1 check failed\./);
+  assert.match(html, /data-report-action="analyse">Retry failed analysis/);
   assert.ok(data.groups.length > 0);
 });
 
-test('V8: the Intents and Sessions switch and the filter chips', () => {
-  assert.ok(html.includes('<div class="switch" id="switch" role="group" aria-label="List"><button type="button" data-v="intents" aria-pressed="true">Intents</button>' +
-    '<button type="button" data-v="sessions" aria-pressed="false">Sessions</button></div>'));
+test('V8: the Sessions and Intents switch and the filter chips', () => {
+  assert.ok(html.includes('<div class="switch" id="switch" role="group" aria-label="List"><button type="button" data-v="sessions" aria-pressed="true">Sessions</button>' +
+    '<button type="button" data-v="intents" aria-pressed="false">Intents</button></div>'));
   assert.ok(html.includes("var FILTERS = [['all', 'All'], ['2', '2+ times'], ['weak', 'Weak links'], ['told', 'Told by user']];"));
   assert.ok(html.includes('<svg id="map"') && html.includes('id="note"') && html.includes('id="tip"'));
+  assert.match(html, /<input type="search" id="file-search" aria-label="Search files"[^>]+aria-controls="map">/);
+  assert.match(html, /id="folder-map-coverage"/);
   assert.ok(html.includes('>Copy improvement prompt</button>') && html.includes('>Show prompt</button>'));
   // The prompt panel: hidden, with the "What to improve" section highlighted.
   assert.ok(html.includes('<section id="prompt" hidden aria-label="Improvement prompt"><p class="intro">'));
@@ -302,7 +311,7 @@ test('V8: the Intents and Sessions switch and the filter chips', () => {
 
 test('V9: two runs in two time zones give the same files', () => {
   assert.equal(r2.json, r1.json);
-  assert.equal(r2.html, r1.html);
+  assert.equal(withoutRunFolders(r2.html), withoutRunFolders(r1.html));
   // Dates in UTC from the session files.
   assert.deepEqual(data.sessions.map(item => [item.date, item.when]).slice(0, 2), [['Nov 20', '2026-11-20 10:00 UTC'], ['Nov 19', '2026-11-19 10:00 UTC']]);
 });

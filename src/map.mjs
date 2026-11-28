@@ -23,15 +23,15 @@ export const MAP_RULES = 'link 1 step, folder link 1 step per level, mention 1 s
 // The start file that a project with no start file of its own can create.
 export const VIRTUAL_START = 'CLAUDE.md';
 
-function read(file) {
+function readDisk(file) {
   try { return readFileSync(file, 'utf8'); } catch { return null; }
 }
 
-function isFile(file) {
+function diskFile(file) {
   try { return statSync(file).isFile(); } catch { return false; }
 }
 
-function isDir(dir) {
+function diskDir(dir) {
   try { return statSync(dir).isDirectory(); } catch { return false; }
 }
 
@@ -144,13 +144,28 @@ function compareLabels(a, b) {
 
 // Returns { map, contextFiles, contextRules }. `config` is null or the object of readConfig.
 // Step 12 (the proof): `memoryRoot` is the project folder of today when `root` is a copy of an old commit.
-export function buildMap({ root, model, files, sessions = null, config = null, memoryRoot = null }) {
+export function buildMap({ root, model, files, sessions = null, config = null, memoryRoot = null, documents = null }) {
   root = path.resolve(root);
+  // A named version lives outside the working tree. Resolve its links, folders
+  // and imports against those saved texts, even when the live files have moved.
+  const directories = new Set([root]);
+  if (documents) for (const name of documents.keys()) {
+    let folder = path.dirname(path.join(root, name));
+    while (!directories.has(folder) && folder !== path.dirname(folder)) {
+      directories.add(folder);
+      folder = path.dirname(folder);
+    }
+  }
+  const read = documents ? file => documents.get(path.relative(root, file)) ?? null : readDisk;
+  const isFile = documents ? file => documents.has(path.relative(root, file)) : diskFile;
+  const isDir = documents ? dir => directories.has(dir) : diskDir;
   const ctx = { root, home: os.homedir(), claudeSettingsHome: model.claudeSettingsHome };
   const toRel = abs => path.relative(root, abs).split(path.sep).join('/');
   const inRoot = abs => abs.startsWith(root + path.sep) && !toRel(abs).split('/').includes('.git');
   // The auto memory of the project. Its files are map files with a `~/.claude/projects/<folder>/memory/` path.
-  const memory = readMemory({ root: memoryRoot ?? root, claudeSettingsHome: model.claudeSettingsHome });
+  const allMemory = documents ? { index: null, files: [], dir: '', display: '' }
+    : readMemory({ root: memoryRoot ?? root, claudeSettingsHome: model.claudeSettingsHome });
+  const memory = model.ignore?.includes('user') ? { ...allMemory, index: null, files: [] } : allMemory;
   const inMemory = abs => memory.files.length > 0 && abs.startsWith(memory.dir + path.sep);
   // The report path of a full path: a project path, a memory path, or null for a path outside both.
   const idOf = abs => (inRoot(abs) ? toRel(abs)
@@ -173,7 +188,7 @@ export function buildMap({ root, model, files, sessions = null, config = null, m
   // Checks 1 to 6 of the rule for a candidate path.
   const listed = new Set(files);
   const { start, auto, skills } = loadedFiles(model);
-  const rule = contextRule({ config, git: model.listing.method === 'git', listed, start, auto, skills });
+  const rule = contextRule({ config, git: model.listing.method === 'git', listed, start, auto, skills, ignore: model.ignore });
   const onDisk = rel => { const abs = path.join(root, rel); return inRoot(abs) && toRel(abs) === rel && isFile(abs); };
   // Files on disk that the file list does not have (git ignores them), and that the tool sees with no link:
   // - `extra`: the files that Claude Code loads by itself, and the candidates of the sessions that the rule lets in
@@ -353,7 +368,7 @@ export function buildMap({ root, model, files, sessions = null, config = null, m
           }
         }
         if (node.memory) continue; // @ imports work only in instruction files
-        for (const target of importsOf(line, abs, ctx)) {
+        for (const target of importsOf(line, abs, ctx, isFile)) {
           if (!inRoot(target)) continue;
           const rel = toRel(target);
           if (!nodes.has(rel)) addLinked(rel);

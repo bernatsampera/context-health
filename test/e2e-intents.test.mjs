@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -86,7 +87,7 @@ const calls = () => readFileSync(log, 'utf8').split('\n').filter(Boolean).map(li
 const sessionOf = call => call.stdin.split('\n', 1)[0].split(' ').at(-1);
 
 function run({ out, cache = cacheA, intents = true, sessions = null, bin = fake }) {
-  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--no-save'];
+  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--verbose', '--ignore', 'none', '--no-save'];
   if (intents) args.push('--intents');
   if (sessions) args.push('--sessions', String(sessions));
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: bin, CONTEXT_HEALTH_FAKE_LOG: log } });
@@ -152,8 +153,8 @@ test('I7, I13, I14: no --intents makes no call, the selection takes the 6 newest
   // Step 8 page: one Sessions row per session with its step 4 status, and the line to run --intents.
   const data0 = pageData(p0.html);
   assert.deepEqual(data0.sessions.map(item => [item.id, item.status]), intents.sessions.map(entry => [entry.sessionId, entry.status]));
-  assert.match(p0.html, /data-state="not-analysed">No session is analysed yet\. Run with <code>--intents<\/code>[^<]*<\/p>/);
-  assert.ok(p0.html.includes('5 sessions wait for it.'));
+  assert.match(p0.html, /data-state="not-analysed"><p>.*5 sessions ready to analyse/);
+  assert.match(p0.html, /data-report-action="analyse">Analyse 5 sessions/);
 });
 
 test('I8: one-message sessions get no call', () => {
@@ -216,7 +217,7 @@ test('I2: a second run uses the cache and gives the same report', () => {
   assert.equal(p1Calls.length, 4 + 2 + 2, 'G9, GL, B, C once, GB and GE twice');
   assert.deepEqual(p2Calls.map(sessionOf).sort(), [GB, GB, GE, GE].sort());
   assert.equal(p2.json, p1.json);
-  assert.equal(p2.html, p1.html);
+  assert.equal(withoutRunFolders(p2.html), withoutRunFolders(p1.html));
   assert.equal(p3Calls, 0);
   const s3 = byId(p3.report);
   for (const sessionId of [G9, GL, B, C]) assert.deepEqual(s3[sessionId], s1[sessionId]);
@@ -278,7 +279,9 @@ test('I11: each call has the safe flags, a temp folder and the header line', () 
 });
 
 test('I12: no claude binary gives failed sessions and a report', () => {
-  assert.equal(p4.status, 0, p4.stderr);
+  assert.equal(p4.status, 2, p4.stderr);
+  assert.match(p4.stderr, /Install Claude Code or add the claude executable to PATH/);
+  assert.ok(p4.html && p4.report.analysis.failures.some(failure => failure.retryable));
   assert.equal(p4Calls, 0);
   const s4 = byId(p4.report);
   for (const sessionId of [G9, GL, GB, GE, C, B]) assert.deepEqual([s4[sessionId].status, s4[sessionId].reason], ['failed', 'claude not found']);

@@ -5,6 +5,7 @@
 // Step 12: one line with the v1 headline (`health.v1.headline`) above the 5 counts, when it is there. The told facts
 // come from `health.parts.found`, so they are rules only: a task fact is not a need and is not in the prompt.
 import { START_WHAT } from './collect.mjs';
+import { ignoreText } from './ignore.mjs';
 import { isNamed } from './context-files.mjs';
 import { buildFixes } from './fixes.mjs';
 import { fixContext } from './health.mjs';
@@ -77,6 +78,7 @@ export function buildPrompt(model) {
     `- Start load: ${num(model.totals.startLoadTokens)} tokens in ${plural(model.totals.startLoadItems, 'item')} (instruction files, the skill and command list).`,
     `- Context files: ${num(model.totals.contextFiles)}. On the map, ${plural(model.map.totals.noneContext, 'context file')} have no path from the start load.`,
     ...scoreLines,
+    ...(model.ignore?.length ? [`- The user chose to leave out the ${ignoreText(model.ignore)}. They are not counted. Do not change them.`] : []),
     'The 5 counts of today:',
     ...countLines,
     // How much data the counts have.
@@ -141,4 +143,14 @@ export function buildPrompt(model) {
     `- When you are done, run context-health again on the same sessions. Compare the 5 counts with the counts above (lines a to e of section 1), and report the change. Lines b and c fall only with new sessions.`
   ]);
   return { text: plain(`${lines.join('\n').trim()}\n`) };
+}
+
+export function findingPrompt(model, finding) {
+  return plain([
+    `Improve the agent instructions for ${model.project.name}. Work only on finding ${finding.id}.`,
+    '## 5. What to improve',
+    finding.text,
+    `Suggested edit: ${finding.target}${finding.line ? ' at line ' + finding.line : ''}.`,
+    'Keep the edit small and preserve unrelated work. If the evidence is insufficient to choose the right rule, leave it for review.'
+  ].join('\n\n'));
 }

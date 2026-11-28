@@ -21,6 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit, withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -78,15 +79,16 @@ function makeProject(name, source, change, include) {
 const gitStatus = project => execFileSync('git', ['-C', project, 'status', '--porcelain', '--untracked-files=all', '--ignored'], { encoding: 'utf8' });
 
 // One run of the real command. `name` is the out folder in the artifact folder.
-function runTool({ name, project, settings, cache, log, intents = true, oldPath = false }) {
+function runTool({ name, project, settings, cache, log, intents = true, oldPath = false, exit = 0 }) {
   const out = path.join(artifact, name);
-  const args = [cli, project, '--claude-settings-home', settings, '--cache', cache, '--out', out, '--no-open', '--no-save', '--config', configs.get(project)];
+  const args = [cli, project, '--claude-settings-home', settings, '--cache', cache, '--out', out, '--no-open', '--verbose', '--ignore', 'none', '--no-save', '--config', configs.get(project)];
   if (oldPath) args.push('--old-path', OLD);
   if (intents) args.push('--intents');
   const result = spawnSync(process.execPath, args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
-  assert.equal(result.status, 0, result.stderr);
   const json = readFileSync(path.join(out, 'report.json'), 'utf8');
-  return { json, html: readFileSync(path.join(out, 'report.html'), 'utf8'), report: JSON.parse(json), stdout: result.stdout };
+  const report = JSON.parse(json);
+  assertReportExit(result, report, exit);
+  return { json, html: readFileSync(path.join(out, 'report.html'), 'utf8'), report, stdout: result.stdout };
 }
 const newLog = name => { const log = path.join(work, `${name}.jsonl`); writeFileSync(log, ''); return log; };
 const newCache = name => mkdtempSync(path.join(work, `cache-${name}-`));
@@ -205,7 +207,7 @@ test('G4: the keys of duplicates keep their order, with needed and neededChecked
   }
   assert.deepEqual(d.facts.map(fact => fact.id), d.facts.map((_fact, k) => `f${k + 1}`));
   const keys = Object.keys(x1.report);
-  assert.deepEqual(keys.slice(keys.indexOf('groups'), keys.indexOf('groups') + 3), ['groups', 'duplicates', 'routes']);
+  assert.deepEqual(keys.slice(keys.indexOf('groups'), keys.indexOf('groups') + 4), ['groups', 'duplicates', 'analysis', 'routes']);
   assert.equal(d.promptVersion, 'duplicates-v2');
   // No session: no file is needed. All files fit, so no note names the limit.
   assert.deepEqual(d.check, { status: 'ok', reason: null, costUsd: 0.0204, checked: d.files, total: d.files, needed: 0, neededChecked: 0 });
@@ -214,7 +216,7 @@ test('G4: the keys of duplicates keep their order, with needed and neededChecked
 
 test('G1, G2 (part X): two runs give the same bytes, and the project and the settings home do not change', () => {
   assert.equal(x2.json, x1.json);
-  assert.equal(x2.html, x1.html);
+  assert.equal(withoutRunFolders(x2.html), withoutRunFolders(x1.html));
   assert.equal(dupCalls(xLog).length, 1, 'run 2 uses the cache');
   assert.deepEqual(xAfter, xBefore);
   assert.match(dupCalls(xLog)[0].stdin.split('\n')[0], new RegExp(`^context-health duplicates duplicates-v2 session ${X_RUN}$`));
@@ -258,7 +260,7 @@ test('X5, X17: an answer with no verdict is a bad answer: one more try, then fai
     writeFileSync(path.join(xProject, rel), '# Extra\n\nA note that gives the project another list of files.\n');
     execFileSync('git', ['-C', xProject, 'add', '-A']);
     const log = newLog(name);
-    const { report } = runTool({ name, project: xProject, settings: xSettings, cache: newCache(name), log });
+    const { report } = runTool({ name, project: xProject, settings: xSettings, cache: newCache(name), log, exit: 2 });
     assert.equal(dupCalls(log).length, 2, `${name}: one more try`);
     assert.match(dupCalls(log)[0].stdin.split('\n')[0], new RegExp(` session ${run}$`));
     const fact = answerOf(run).result.facts[0];
@@ -336,7 +338,7 @@ const lBefore = [gitStatus(lProject), snapshot(lSettings)];
 const lCache = newCache('l');
 const lLog = newLog('l');
 const l1 = runTool({ name: 'l', project: lProject, settings: lSettings, cache: lCache, log: lLog, oldPath: true });
-const l2 = runTool({ name: 'l', project: lProject, settings: lSettings, cache: lCache, log: lLog, oldPath: true });
+const l2 = runTool({ name: 'l', project: lProject, settings: lSettings, cache: lCache, log: lLog, oldPath: true, exit: 2 });
 const lAfter = [gitStatus(lProject), snapshot(lSettings)];
 const lStdin = dupCalls(lLog)[0].stdin;
 const lOrder = pathsIn(lStdin);
@@ -492,7 +494,7 @@ test('L4: the run id is the hash of the sorted paths, also when the order of the
 
 test('L5, G1, G2 (part L): the same input and the same reports on each run, and no change in the project', () => {
   assert.equal(l2.json, l1.json);
-  assert.equal(l2.html, l1.html);
+  assert.equal(withoutRunFolders(l2.html), withoutRunFolders(l1.html));
   assert.equal(dupCalls(lLog).length, 1, 'run 2 uses the cache');
   // A run with a new cache calls the model again: the input is the same, byte for byte, and so are the reports.
   const log = newLog('l-again');
@@ -500,7 +502,7 @@ test('L5, G1, G2 (part L): the same input and the same reports on each run, and 
   assert.equal(dupCalls(log).length, 1);
   assert.equal(dupCalls(log)[0].stdin, lStdin);
   assert.equal(l3.json, l1.json);
-  assert.equal(l3.html, l1.html);
+  assert.equal(withoutRunFolders(l3.html), withoutRunFolders(l1.html));
   assert.deepEqual(lAfter, lBefore);
   assert.deepEqual([gitStatus(lProject), snapshot(lSettings)], lBefore);
 });

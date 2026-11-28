@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="token" content="{{token}}">
+<meta name="theme-color" content="#f6f7f3">
+<title>Context Health</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23205747'/%3E%3Cpath d='M6 15.5h5l3-7 4.5 15L22 16h4' fill='none' stroke='white' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/workspace.css">
+</head>
+<body>
+<a href="#view" class="skip-link">Skip to content</a>
+<header id="bar">
+  <div class="mast">
+    <a class="brand" href="#/" aria-label="Context Health projects">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M6 15.5h5l3-7 4.5 15L22 16h4" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Context Health</span>
+    </a>
+    <nav aria-label="Breadcrumb" id="breadcrumb"></nav>
+    <button class="activity-button" type="button" id="activity-toggle" aria-haspopup="dialog"><i aria-hidden="true"></i><span id="activity-text" role="status" aria-live="polite">Checking activity</span><span id="activity-task" hidden></span></button>
+  </div>
+</header>
+<main id="view" tabindex="-1"><div class="page pending-page" role="status">Opening workspace…</div></main>
+<dialog id="dialog"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>

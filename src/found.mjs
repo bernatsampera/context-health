@@ -29,15 +29,19 @@ export function weakWayOf(need) {
   return head && head.path === need.path && WEAK.has(head.how) ? head.how : null;
 }
 
+export function searchedWayOf(need, mapFiles) {
+  const way = weakWayOf(need);
+  if (way !== 'none') return way;
+  const file = mapFiles.get(need.path);
+  // The start can name a skill or a memory file even when its path is absent from the record.
+  const namedAtStart = file?.steps === 1 && (file.route.at(-1)?.via === 'trigger' ||
+    mapFiles.get(file.route.at(-2)?.path)?.kind === 'memory index');
+  return namedAtStart ? null : way;
+}
+
 // `ctx` is the result of `fixContext(model)` of src/health.mjs.
 export function foundFiles(model, ctx) {
   const mapFiles = ctx.mapFiles;
-  // A file 1 step away that the start names without its path: behind a trigger, or linked by the memory index.
-  const namedAtStart = rel => {
-    const file = mapFiles.get(rel);
-    if (!file || file.steps !== 1) return false;
-    return file.route.at(-1).via === 'trigger' || mapFiles.get(file.route.at(-2)?.path)?.kind === 'memory index';
-  };
   const linkerOf = rel => {
     const file = mapFiles.get(rel);
     if (!file || !file.steps) return null;
@@ -52,8 +56,8 @@ export function foundFiles(model, ctx) {
       const entry = files.get(need.path) || { path: need.path, uses: 0, steps: ctx.stepsOf(need.path), state: null, searched: 0,
         ways: { search: 0, user: 0, none: 0 }, linker: linkerOf(need.path) };
       entry.uses += 1;
-      const way = weakWayOf(need);
-      if (way && !(way === 'none' && namedAtStart(need.path))) { entry.searched += 1; entry.ways[way] += 1; }
+      const way = searchedWayOf(need, mapFiles);
+      if (way) { entry.searched += 1; entry.ways[way] += 1; }
       files.set(need.path, entry);
     }
   }

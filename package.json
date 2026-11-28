@@ -16,5 +16,6 @@
     "test": "node --test \"test/*.test.mjs\"",
     "ab": "node fixtures/context-ab/ab.mjs"
   },
-  "engines": { "node": ">=24" }
+  "engines": { "node": ">=24" },
+  "devDependencies": { "jsdom": "26.1.0" }
 }

@@ -18,7 +18,7 @@ const AGENT_TEXT_CUT = 400;
 const PARALLEL = 4;
 const CALL_TIMEOUT_MS = 10 * 60 * 1000;
 // Env of a parent Claude Code session. The call must not join that session.
-const PARENT_ENV = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_PID', 'CLAUDE_CODE_ENTRYPOINT',
+export const PARENT_ENV = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_PID', 'CLAUDE_CODE_ENTRYPOINT',
   'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS', 'CLAUDE_CODE_SESSION_ATTENDED'];
 
 const num = value => value.toLocaleString('en-US');
@@ -32,6 +32,17 @@ function claudeBin() {
   return bin.includes('/') ? path.resolve(bin) : bin;
 }
 
+// The dashboard CLI has a private IPC channel. Updating it on actual process
+// events keeps cached and local work out of the model activity indicator.
+export function trackModelProcess(child) {
+  if (!process.send || !process.env.CONTEXT_HEALTH_PROGRESS) return;
+  const publish = type => { if (process.connected) process.send({ type }, () => {}); };
+  child.once('spawn', () => {
+    publish('modelStart');
+    child.once('close', () => publish('modelEnd'));
+  });
+}
+
 function callOnce({ bin, args, input }) {
   return new Promise(resolve => {
     // A new empty folder outside the project for each call, so the call loads no project context.
@@ -39,6 +50,7 @@ function callOnce({ bin, args, input }) {
     const env = { ...process.env };
     for (const key of PARENT_ENV) delete env[key];
     const child = spawn(bin, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    trackModelProcess(child);
     let stdout = '';
     let done = false;
     const finish = result => {
@@ -77,6 +89,8 @@ export async function runClaude({ model, systemPrompt, input, parse = text => te
   let last = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const result = await callOnce({ bin, args, input });
+    // The dashboard counts these lines for its progress bar.
+    if (process.env.CONTEXT_HEALTH_PROGRESS && (result.ok || attempt === 1 || !result.retry)) console.log('progress: call done');
     cost += result.costUsd || 0;
     if (result.ok) {
       try {
@@ -203,8 +217,8 @@ function readCache(file) {
 // ---------- main ----------
 
 // options: { allowCalls, model, cacheDir, limit }
-export async function findIntents({ sessions, memory, options }) {
-  const { allowCalls = false, model = 'sonnet', cacheDir, limit = 20 } = options;
+export function planIntents({ sessions, memory, options }) {
+  const { model = 'sonnet', cacheDir, limit = 20 } = options;
   const prompt = readFileSync(PROMPT_FILE, 'utf8');
   const folder = path.join(cacheDir, 'intents');
   let selected = 0;
@@ -233,16 +247,24 @@ export async function findIntents({ sessions, memory, options }) {
         continue;
       } catch { /* a bad cache file counts as a miss */ }
     }
-    if (!allowCalls) { Object.assign(item, { status: 'not-analysed', reason: 'not analysed: run with --intents' }); continue; }
     pending.push(item);
+  }
+  return { entries, pending, parse, folder, prompt };
+}
+
+export async function findIntents(args) {
+  const { allowCalls = false, call = runClaude, model = 'sonnet', limit = 20 } = args.options;
+  const { entries, pending, parse, folder, prompt } = planIntents(args);
+  if (!allowCalls) {
+    for (const item of pending) Object.assign(item, { status: 'not-analysed', reason: 'not analysed: run with --intents' });
   }
 
   let calls = 0;
-  if (pending.length) {
+  if (allowCalls && pending.length) {
     mkdirSync(folder, { recursive: true });
     console.log(`intents: ${pending.length} model calls (${model}), up to ${PARALLEL} at a time`);
     await mapLimit(pending, PARALLEL, async item => {
-      const result = await runClaude({ model, systemPrompt: prompt, input: item.input, parse: parse(item.entry.messages) });
+      const result = await call({ model, systemPrompt: prompt, input: item.input, parse: parse(item.entry.messages) });
       calls += 1;
       if (!result.ok) { Object.assign(item, { status: 'failed', reason: result.reason }); return; }
       writeFileSync(item.file, `${JSON.stringify({ promptVersion: PROMPT_VERSION, model, sessionId: item.entry.sessionId,

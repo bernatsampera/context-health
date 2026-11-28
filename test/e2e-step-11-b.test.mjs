@@ -193,7 +193,7 @@ answer(`${ID(6)}.needs-check.json`, { checks: [check('c1')] });
 const runs = [];
 function run(name, home, { old = true, intents = true, out = path.join(work, 'out', name) } = {}) {
   mkdirSync(out, { recursive: true });
-  const args = [cli, M, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--no-save', '--config', CONFIG];
+  const args = [cli, M, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--ignore', 'none', '--no-save', '--config', CONFIG];
   if (old) args.push('--old-path', OLD);
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake } });
@@ -405,12 +405,18 @@ test('NC10, NC12: the counts move when the context changes', () => {
   assert.deepEqual([bad.noRoute.base, better.noRoute.base], ['of 6 needed files', 'of 6 needed files']);
 });
 
-test('NC11: the command prints the 5 counts, and no score', () => {
-  for (const { stdout, name } of [main, noSessions, notAnalysed, noNeeds]) {
+test('NC11: first runs show a next step, and analysed runs show the counts and health', () => {
+  for (const { stdout, name } of [main, noNeeds]) {
     const lines = stdout.split('\n');
     assert.equal(lines.filter(line => line.startsWith('counts:')).length, 1, name);
-    assert.ok(!lines.some(line => /^(score|health):/.test(line)), name);
+    assert.equal(lines.filter(line => line.startsWith('Health:')).length, 1, name);
   }
+  for (const { stdout, name } of [noSessions, notAnalysed]) {
+    assert.doesNotMatch(stdout, /^(counts|Health):/m, name);
+    assert.match(stdout, /Explore the files in the report below\./, name);
+  }
+  assert.match(noSessions.stdout, /No sessions found.*--old-path/);
+  assert.match(notAnalysed.stdout, /ready to analyse/);
   const line = main.stdout.split('\n').find(item => item.startsWith('counts:'));
   for (const part of ['2 of 11 needed files with no route', '5 with a route but searched', '4 facts typed (1 saved)', `start load ${num(C.startLoad.tokens)} tokens`, '6 of 9 sessions']) {
     assert.ok(line.includes(part), `${line} has "${part}"`);
@@ -521,25 +527,17 @@ test('PG5: text from a session or a path does not break the page', () => {
 });
 
 test('PG6: the fixes of the page are the fixes of report.fixes', () => {
-  // Step 12: each fix of the list is under its question in the score part, with its number. The smaller items are in the fixes part.
-  const li = /<li data-fix="([^"]*)" data-kind="([^"]*)"><div class="ft">([\s\S]*?)<\/div>(?:<div class="m">([^<]*)<\/div>)?<\/li>/g;
+  const li = /<li data-fix="([^"]*)" data-kind="([^"]*)"><h3 id="finding-[^"]*" tabindex="-1">([^<]+)<\/h3>[\s\S]*?<details class="finding-plan"><summary>See suggested edit<\/summary><div class="ft">([\s\S]*?)<\/div>/g;
   for (const { html, report, name } of runs) {
     const f = report.fixes;
     const section = sectionOf(html, 'fixes');
     assert.ok(f.list.length <= f.limit, name);
     assert.ok(section.includes(`data-fixes="${f.list.length}" data-smaller="${f.smaller.length}"`), name);
-    const split = section.indexOf('<details');
-    const byId = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
-    const list = [...sectionOf(html, 'health').matchAll(li)].sort((a, b) => byId([a[1]], [b[1]]));
-    const want = [...f.list].sort((a, b) => byId([a.id], [b.id]));
-    assert.deepEqual(list.map(match => [match[1], match[2], textOf(match[3].replace(/<b class="fn">\d+\.<\/b>/, '').replace(/<\/?code>/g, ""))]), want.map(fix => [fix.id, fix.kind, fix.text.replace(/`/g, '').replace(/\s+/g, ' ').trim()]), name);
-    list.forEach((match, k) => { if (typeof want[k].needs === 'number') assert.ok(match[4].startsWith(`Covers ${num(want[k].needs)} need`), name); });
-    for (const match of list) assert.ok(match[3].startsWith(`<b class="fn">${f.list.findIndex(fix => fix.id === match[1]) + 1}.</b> `), 'each fix of the list has its number');
-    if (f.smaller.length) {
-      const more = section.slice(split);
-      assert.ok(more.startsWith(`<details class="hother" id="fix-smaller"><summary>${f.smaller.length} smaller item${f.smaller.length === 1 ? '' : 's'}</summary>`), name);
-      assert.deepEqual([...more.matchAll(li)].map(match => match[1]), f.smaller.map(fix => fix.id), name);
-    } else assert.equal(split, -1, name);
+    const list = [...section.matchAll(li)];
+    const want = [...f.list, ...f.smaller];
+    assert.deepEqual(list.map(match => [match[1], match[2], textOf(match[4].replace(/<\/?code>/g, ""))]),
+      want.map(fix => [fix.id, fix.kind, fix.text.replace(/`/g, '').replace(/\s+/g, ' ').trim()]), name);
+    assert.equal(section.includes('<details class="hother" id="fix-smaller">'), f.smaller.length > 0, name);
     assert.equal(section.includes('<p class="nofix">No fix from this data.</p>'), !f.list.length && !f.smaller.length, name);
   }
   // A run with no data has no fix.

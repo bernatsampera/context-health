@@ -320,9 +320,27 @@ function covered(exact, modelFacts) {
     (norm(item.quote).includes(norm(place.quote).replace(/[.!?]+$/, '')) || norm(place.quote).includes(norm(item.quote).replace(/[.!?]+$/, ''))))));
 }
 
+function mergeFacts(exact, modelFacts) {
+  const kept = exact.filter(fact => !covered(fact, modelFacts));
+  return [...modelFacts, ...kept.map(({ key: _key, ...fact }) => fact)]
+    .sort((a, b) => (b.differ - a.differ) || b.places.length - a.places.length || cmp(a.what, b.what) || cmp(a.places[0].path, b.places[0].path))
+    .map(({ id: _oldId, ...fact }, k) => ({ id: `f${k + 1}`, ...fact }));
+}
+
+// Recheck exact copies and verify the original model's quotes against this set of saved documents.
+export function savedDuplicateFacts(files, previous) {
+  const texts = new Map(files.map(file => [file.path, norm(file.text)]));
+  const verified = [];
+  for (const fact of previous) {
+    const places = fact.places.filter(p => norm(p.quote) && texts.get(p.path)?.includes(norm(p.quote)));
+    if (places.length >= 2) verified.push({ ...fact, places, differ: fact.differ && concreteDifference(places) });
+  }
+  return mergeFacts(exactFacts(files), verified);
+}
+
 // options: { allowCalls, model, cacheDir }
 export async function findDuplicates({ model, options }) {
-  const { allowCalls = false, model: modelName = 'sonnet', cacheDir } = options;
+  const { allowCalls = false, call = runClaude, model: modelName = 'sonnet', cacheDir } = options;
   const prompt = readFileSync(PROMPT_FILE, 'utf8');
   const files = contextTexts(model);
   const isNeeded = file => file.uses > 0;
@@ -331,10 +349,7 @@ export async function findDuplicates({ model, options }) {
   const exact = exactFacts(files);
   const notes = [];
   const done = (check, modelFacts) => {
-    const kept = exact.filter(fact => !covered(fact, modelFacts));
-    const facts = [...modelFacts, ...kept.map(({ key: _k, ...fact }) => fact)]
-      .sort((a, b) => (b.differ - a.differ) || b.places.length - a.places.length || cmp(a.what, b.what) || cmp(a.places[0].path, b.places[0].path))
-      .map((fact, k) => ({ id: `f${k + 1}`, ...fact }));
+    const facts = mergeFacts(exact, modelFacts);
     return { promptVersion: PROMPT_VERSION, model: modelName, files: files.length, exact: exact.length, check, facts, notes };
   };
   // `read`: the files that the model check read. Empty when the check did not run.
@@ -368,7 +383,7 @@ export async function findDuplicates({ model, options }) {
     return done(check('not-analysed', 'not analysed: run with --intents', null, []), []);
   }
   console.log(`duplicates: 1 model call (${modelName}) for ${counts}`);
-  const result = await runClaude({ model: modelName, systemPrompt: prompt, input, parse });
+  const result = await call({ model: modelName, systemPrompt: prompt, input, parse });
   if (!result.ok) {
     console.log(`duplicates: failed (${result.reason}). Exact copies only.`);
     return done(check('failed', result.reason, null, []), []);

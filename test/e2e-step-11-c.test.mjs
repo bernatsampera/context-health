@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -197,7 +198,7 @@ writeFileSync(log, '');
 const all = [];
 function run(name, project, home, { intents = true, out = null } = {}) {
   const once = (dir, cache) => {
-    const args = [cli, project, '--claude-settings-home', home, '--out', dir, '--cache', path.join(work, 'cache', cache), '--no-open', '--no-save', '--old-path', OLD];
+    const args = [cli, project, '--claude-settings-home', home, '--out', dir, '--cache', path.join(work, 'cache', cache), '--no-open', '--ignore', 'none', '--no-save', '--old-path', OLD];
     if (intents) args.push('--intents');
     const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
     assert.equal(result.status, 0, `${name}: ${result.stderr}`);
@@ -309,7 +310,7 @@ test('FX8, FX9, FX12, FX14: the invariants of each run', () => {
 test('FX3: two runs give the same report', () => {
   for (const item of all) {
     assert.equal(item.second.json, item.json, `${item.name}: report.json`);
-    assert.equal(item.second.html, item.html, `${item.name}: report.html`);
+    assert.equal(withoutRunFolders(item.second.html), withoutRunFolders(item.html), `${item.name}: report.html`);
   }
 });
 
@@ -503,8 +504,7 @@ test('FX18: each list of section 4 has 15 items at most', () => {
 // Added by the supervisor: the page side of FX10 and PG6 (the closed part with the smaller items needs a run with more
 // than 10 causes, and only this file has one).
 // Step 12: the fixes of `list` are under their question in the health section, each with its number. The section
-// `fixes` holds only the closed part with the smaller items.
-test('FX10, PG6: the page shows the same fixes as the prompt, 10 under the questions and the others in a closed part', () => {
+test('FX10, PG6: the page lists fixes in prompt order, then the smaller fixes in a closed part', () => {
   const esc = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replace(/`([^`]+)`/g, '<code>$1</code>');
   for (const item of all) {
     const fixes = item.report.fixes;
@@ -512,12 +512,14 @@ test('FX10, PG6: the page shows the same fixes as the prompt, 10 under the quest
     assert.ok(section, item.name);
     assert.deepEqual([Number(section[1]), Number(section[2])], [fixes.list.length, fixes.smaller.length], item.name);
     const health = item.html.match(/<section class="health" id="health"[^>]*>([\s\S]*?)<\/section>/)[1];
-    const [, smaller = ''] = section[3].split('<details class="hother" id="fix-smaller">');
-    // Each fix one time: the health section has the fixes of `list`, the closed part the fixes of `smaller`.
-    assert.deepEqual([...health.matchAll(/<li data-fix="([^"]+)"/g)].map(match => match[1]).sort(), fixes.list.map(fix => fix.id).sort(), item.name);
+    const [ranked, smaller = ''] = section[3].split('<details class="hother" id="fix-smaller">');
+    assert.deepEqual([...ranked.matchAll(/<li data-fix="([^"]+)"/g)].map(match => match[1]), fixes.list.map(fix => fix.id), item.name);
     assert.deepEqual([...smaller.matchAll(/<li data-fix="([^"]+)"/g)].map(match => match[1]), fixes.smaller.map(fix => fix.id), item.name);
-    fixes.list.forEach((fix, k) => assert.ok(health.includes(`<div class="ft"><b class="fn">${k + 1}.</b> ${esc(fix.text)}</div>`), `${item.name} ${fix.id}`));
-    for (const fix of fixes.smaller) assert.ok(section[3].includes(`<div class="ft">${esc(fix.text)}</div>`), `${item.name} ${fix.id}`);
+    fixes.list.forEach(fix => {
+      assert.ok(health.includes(`href="#finding-${fix.id}"`), `${item.name} ${fix.id}`);
+      assert.ok(ranked.includes(`id="finding-${fix.id}" tabindex="-1"`) && ranked.includes(`<div class="ft">${esc(fix.text)}</div>`), `${item.name} ${fix.id}`);
+    });
+    for (const fix of fixes.smaller) assert.ok(smaller.includes(`id="finding-${fix.id}" tabindex="-1"`) && smaller.includes(esc(fix.text)), `${item.name} ${fix.id}`);
     if (!fixes.total) assert.ok(section[3].includes('<p class="nofix">No fix from this data.</p>'), item.name);
   }
   const many = all.find(item => item.report.fixes.smaller.length === 2);

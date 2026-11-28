@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -363,7 +364,7 @@ const twice = [];
 // `cache` names the cache folder: the config runs use the cache of the main run, so they make no call.
 function run(name, root, { home = repoSettings, old = false, intents = false, again = false, out2 = null, config = null, cache = name } = {}) {
   const once = out => {
-    const args = [cli, root, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--no-save'];
+    const args = [cli, root, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', cache), '--no-open', '--ignore', 'none', '--no-save'];
     if (old) args.push('--old-path', OLD);
     if (intents) args.push('--intents');
     if (config) args.push('--config', config);
@@ -393,7 +394,7 @@ const noGit = run('nogit', NOGIT, { again: true });
 // The runs that the command must refuse: [status, stderr, report written].
 const refused = BAD_CONFIGS.map(item => {
   const out = path.join(work, 'out', `bad-${item.name.replace(/[^a-z]+/g, '-')}`);
-  const result = spawnSync('node', [cli, P, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', path.join(work, 'cache', 'bad'), '--no-open', '--no-save', '--config', item.file],
+  const result = spawnSync('node', [cli, P, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', path.join(work, 'cache', 'bad'), '--no-open', '--ignore', 'none', '--no-save', '--config', item.file],
     { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake } });
   return { ...item, status: result.status, stderr: result.stderr, written: existsSync(path.join(out, 'report.json')) || existsSync(path.join(out, 'report.html')) };
 });
@@ -1032,7 +1033,7 @@ test('CF21: two runs give the same report and the same page', () => {
   assert.deepEqual(twice.map(item => item.name), ['main', 'config-include', 'noclaude', 'nostart', 'nogit']);
   for (const { name, first, second } of twice) {
     assert.equal(first.json, second.json, `${name}: report.json`);
-    assert.equal(first.html, second.html, `${name}: report.html`);
+    assert.equal(withoutRunFolders(first.html), withoutRunFolders(second.html), `${name}: report.html`);
   }
   // The second run of main makes no call: each answer is in the cache.
   assert.equal(inputsOf('duplicates', duplicateIds[0]).length, 3, '2 tries of the first run, then 1 call');

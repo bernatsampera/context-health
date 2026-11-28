@@ -1,0 +1,1 @@
+{ "result": { "intents": [{ "start": 1, "goal": "Learn the project from its files", "corrections": [] }, { "start": 2, "goal": "Read the file that the user named", "corrections": [] }] }, "total_cost_usd": 0.01 }

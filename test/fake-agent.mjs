@@ -3,11 +3,27 @@
 // It logs { argv, cwd } to CONTEXT_HEALTH_FAKE_AGENT_LOG, adds one line to CLAUDE.md in its folder (the "fix"),
 // and writes a session file for its --session-id in CONTEXT_HEALTH_FAKE_AGENT_PROJECTS/<encoded cwd>/,
 // as Claude Code does. The report after the fix must not count that session.
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+// With -p it is the agent of the dashboard: it reads the prompt from stdin, edits 2 files, makes 1 file, and prints the JSON answer.
+// With a non-empty file agent-sleep in TMPDIR, it waits, so that the test can stop it.
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const argv = process.argv.slice(2);
 const cwd = process.cwd();
+if (argv.includes('-p')) {
+  let stdin = '';
+  for await (const chunk of process.stdin) stdin += chunk;
+  appendFileSync(process.env.CONTEXT_HEALTH_FAKE_AGENT_LOG, `${JSON.stringify({ argv, cwd, stdin,
+    claudeMd: readFileSync(path.join(cwd, 'CLAUDE.md'), 'utf8'), untracked: existsSync(path.join(cwd, 'untracked.md')) })}\n`);
+  const sleep = path.join(process.env.TMPDIR, 'agent-sleep');
+  if (existsSync(sleep) && readFileSync(sleep, 'utf8')) await new Promise(resolve => setTimeout(resolve, 60_000));
+  for (const name of ['CLAUDE.md', 'README.md']) appendFileSync(path.join(cwd, name), '\n- Fake fix: read docs/README.md for the data rules.\n');
+  appendFileSync(path.join(cwd, 'CLAUDE.md'), '- Read first-iteration/docs/tiktok-first-post-2026-09-27.md for the first post.\n');
+  mkdirSync(path.join(cwd, 'docs'), { recursive: true });
+  writeFileSync(path.join(cwd, 'docs', 'new note.md'), '# Fake fix\n');
+  console.log(JSON.stringify({ type: 'result', is_error: false, result: 'Done.', total_cost_usd: 0.12, permission_denials: [] }));
+  process.exit(0);
+}
 appendFileSync(process.env.CONTEXT_HEALTH_FAKE_AGENT_LOG, `${JSON.stringify({ argv, cwd })}\n`);
 appendFileSync(path.join(cwd, 'CLAUDE.md'), '\n- Fake fix: read docs/README.md for the data rules.\n');
 const sessionId = argv[argv.indexOf('--session-id') + 1];

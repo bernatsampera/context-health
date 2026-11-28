@@ -10,13 +10,19 @@
 import path from 'node:path';
 import { isNamed } from './context-files.mjs';
 
-export const METHOD = 'v1';
+// v1: Served, Slow and Missed, from the map only. v2: v1 without the user settings and the skills (src/ignore.mjs).
+// v3: a need with no route that the agent found by search is Searched, with the points of Slow.
+export const METHOD = 'v3';
+
+// A search gave the path, or the path of the file that the agent came from.
+export const isSearched = need => need.state === 'search' || need.route?.[0]?.how === 'search';
 export const THIN = { sessions: 5, needs: 20 };
 export const PENALTY = { max: 15, freeTokens: 3000, perTokens: 1000 };
 export const PROOF_LIMITS = { served: 10, other: 10 };
 export const RULES = 'Each need of each intent gets a grade on the map of today. Served: a route of 0 or 1 step, and a start file names the file or loads it. ' +
-  'Slow: a route of 2 or more steps, or a route of 1 step by a folder link only. Missed: no route. A rule that you had to type takes the grade of ' +
-  'the file with a route that holds it now, else it is Missed. Raw score = 100 x (Served + 0.5 x Slow) / all needs. ' +
+  'Slow: a route of 2 or more steps, or a route of 1 step by a folder link only. Searched: no route, and the agent found the file by a search ' +
+  '(grep, ls, find, glob), or through a file that it found by a search. Missed: no route and no search. A rule that you had to type takes the grade of ' +
+  'the file with a route that holds it now, else it is Missed. Raw score = 100 x (Served + 0.5 x Slow + 0.5 x Searched) / all needs. ' +
   'The start load penalty takes 1 point for each 1,000 unused tokens above 3,000, and 15 points at most. ' +
   'Score = raw score minus penalty, from 0 to 100. Good from 80, mixed from 50, else poor. ' +
   'With fewer than 5 analysed sessions or fewer than 20 needs, there is not enough data for a number. ' +
@@ -110,8 +116,12 @@ const NO_DATA = {
   'not-analysed': 'No session is analysed. Run with --intents.',
   'no-needs': 'The analysed sessions have no need: no context file read and no typed rule.'
 };
-const HEAD = { 'not-proven': 'Score not proven', thin: 'Not enough data', 'no-data': 'No data' };
-const headlineOf = v1 => (v1.shown === 'score' ? `${v1.score} ${v1.label} (method ${METHOD})` : `${HEAD[v1.shown]} (method ${METHOD}). ${v1.reason}`);
+export function scoreTitle(state, analysed) {
+  if (state === 'thin') return `Early findings from ${count(analysed, 'session')}`;
+  if (state === 'not-proven') return 'Score not proven';
+  return 'No data';
+}
+const headlineOf = v1 => (v1.shown === 'score' ? `${v1.score} ${v1.label} (method ${v1.method})` : `${scoreTitle(v1.shown, v1.base.analysed)} (method ${v1.method}). ${v1.reason}`);
 const firstUpper = text => text.charAt(0).toUpperCase() + text.slice(1);
 
 // Add the proof. It changes only `proof`, `shown`, `reason` and `headline` (P14). No data and thin data stay.
@@ -138,15 +148,17 @@ export function buildV1(model, ctx, noData = 'no-needs') {
   // The files: each needed file, and each file with a route that holds a typed rule.
   const files = new Map();
   const fileOf = rel => {
-    if (!files.has(rel)) files.set(rel, { path: rel, grade: gradeOfPath(rel), steps: ctx.stepsOf(rel), uses: 0, needs: 0, facts: 0 });
+    if (!files.has(rel)) files.set(rel, { path: rel, grade: gradeOfPath(rel), steps: ctx.stepsOf(rel), uses: 0, needs: 0, facts: 0, searched: 0 });
     return files.get(rel);
   };
-  const grades = { served: 0, slow: 0, missed: 0, total: 0 };
+  const grades = { served: 0, slow: 0, searched: 0, missed: 0, total: 0 };
   for (const need of fileNeeds) {
     const file = fileOf(need.path);
     file.uses += 1;
     file.needs += 1;
-    grades[file.grade] += 1;
+    const searched = file.grade === 'missed' && isSearched(need);
+    if (searched) file.searched += 1;
+    grades[searched ? 'searched' : file.grade] += 1;
   }
   // The typed rules, one entry for each text and place.
   const rules = new Map();
@@ -166,30 +178,34 @@ export function buildV1(model, ctx, noData = 'no-needs') {
   const ruleList = [...rules.values()].sort((a, b) => b.uses - a.uses || cmp(a.text, b.text) || cmp(a.savedPath ?? '', b.savedPath ?? ''));
   const byUses = (a, b) => b.uses - a.uses || cmp(a.path, b.path);
   const fileList = [...files.values()].sort(byUses);
+  // Each need of the file was found by search: the file is Searched. With one other need, it stays Missed.
+  for (const file of fileList) if (file.grade === 'missed' && file.needs > 0 && file.searched === file.needs) file.grade = 'searched';
 
   // The score.
   const analysed = model.intents.sessions.filter(entry => entry.status === 'ok').length;
   const total = model.sessions.list.length + model.sessions.skipped.length;
   const penalty = penaltyOf(model, ctx, new Set(fileNeeds.map(need => need.path)));
-  const rawExact = grades.total ? (100 * (grades.served + 0.5 * grades.slow)) / grades.total : null;
+  const rawExact = grades.total ? (100 * (grades.served + 0.5 * grades.slow + 0.5 * grades.searched)) / grades.total : null;
   const score = rawExact == null ? null : Math.round(Math.min(100, Math.max(0, rawExact - penalty.points)));
   const has = grades.total > 0;
   const ran = model.intents.sessions.some(entry => entry.status === 'ok' && entry.intents.length);
 
-  // Question 1: the Missed files and the Missed rules.
+  // Question 1: the Missed and the Searched files, and the Missed rules.
   const needsText = n => count(n, 'need');
-  const missedFiles = fileList.filter(file => file.grade === 'missed').map(file => {
+  const missedFiles = fileList.filter(file => file.grade === 'missed' || file.grade === 'searched').map(file => {
     const gap = ctx.gapOf(file.path);
     const where = ctx.place(gap);
-    return { label: file.path, count: needsText(file.uses), text: `${ctx.whyOf(file.path, gap)} ${where.text}`, path: file.path, kind: 'file',
-      uses: file.uses, grade: 'missed', gap, target: where.target, line: where.line };
+    return { label: file.path, count: needsText(file.uses), text: `${file.grade === 'searched' ? 'The agent found it by search. ' : ''}${ctx.whyOf(file.path, gap)} ${where.text}`, path: file.path, kind: 'file',
+      uses: file.uses, grade: file.grade, gap, target: where.target, line: where.line };
   });
   const toldText = rule => (rule.saved ? `It is already saved in ${rule.savedPath}.`
     : rule.savedPath ? `The fact is in ${rule.savedPath} now, but that file has no route from the start. ${ctx.place(rule.savedPath).text}`
       : 'Write this fact in the file that the agent reads for this task.');
   const missedRules = ruleList.filter(rule => !rule.saved).map(rule => ({ label: rule.text, count: needsText(rule.uses), text: toldText(rule),
     path: rule.savedPath, kind: 'fact', uses: rule.uses, grade: 'missed', quote: rule.quote }));
-  const findAnswer = [missedFiles.length ? count(missedFiles.length, 'file') : null, missedRules.length ? count(missedRules.length, 'fact') : null].filter(Boolean);
+  const searchedFiles = missedFiles.filter(file => file.grade === 'searched').length;
+  const lost = [missedFiles.length - searchedFiles ? count(missedFiles.length - searchedFiles, 'file') : null, missedRules.length ? count(missedRules.length, 'fact') : null].filter(Boolean);
+  const findAnswer = [searchedFiles ? `${count(searchedFiles, 'file')} searched` : null, lost.length ? `${lost.join(' and ')} missed` : null].filter(Boolean);
 
   // Question 2: the Slow files, each with the file and the line to change.
   const slowFiles = fileList.filter(file => file.grade === 'slow').map(file => {
@@ -231,7 +247,7 @@ export function buildV1(model, ctx, noData = 'no-needs') {
 
   const question = (key, title, answer, items, lines = []) => ({ key, title, answer, n: items.length, lines, items });
   const questions = [
-    question('find', 'Can the agent find what it needs?', !has ? null : findAnswer.length ? `${findAnswer.join(' and ')} missed` : 'Yes', [...missedFiles, ...missedRules]
+    question('find', 'Can the agent find what it needs?', !has ? null : findAnswer.length ? findAnswer.join(searchedFiles && lost.length > 1 ? ', ' : ' and ') : 'Yes', [...missedFiles, ...missedRules]
       .sort((a, b) => b.uses - a.uses || cmp(a.label, b.label))),
     question('close', 'Are the needed files close to the start?', !has ? null : slowFiles.length ? `${count(slowFiles.length, 'file')} slow` : 'Yes', slowFiles),
     question('told', 'Did you have to tell the agent?', !has ? null : toldItems.length ? `${count(toldItems.length, 'rule')} typed, ${num(savedRules)} already saved` : 'Yes', toldItems),

@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit, withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -221,7 +222,7 @@ const cacheA = path.join(work, 'cache-a');
 
 function run({ out, cache = cacheA, home = settings, intents = true, env = {} }) {
   const from = allCalls().length;
-  const args = [cli, project, '--claude-settings-home', home, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--no-save'];
+  const args = [cli, project, '--claude-settings-home', home, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--verbose', '--ignore', 'none', '--no-save'];
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log, ...env } });
   const json = existsSync(path.join(out, 'report.json')) ? readFileSync(path.join(out, 'report.json'), 'utf8') : null;
@@ -466,11 +467,11 @@ test('S13: the "Files now" part gets only the room that the rest of the input le
 
 test('S8, G1: the cache, a changed memory file, and no --intents', () => {
   // Run 2: no check call, no intents call, and the same report.
-  assert.equal(r2.status, 0, r2.stderr);
+  assertReportExit(r2, r2.report, 2);
   assert.deepEqual(r2.checks, []);
   assert.ok(!r2.calls.some(call => head(call).startsWith('context-health intents ')));
   assert.equal(r2.json, r1.json);
-  assert.equal(r2.html, r1.html);
+  assert.equal(withoutRunFolders(r2.html), withoutRunFolders(r1.html));
   const cached = name => readdirSync(path.join(cacheA, 'needs')).filter(file => file.startsWith(name)).length;
   // Run 3: no --intents and no cached check. No call, each check is not analysed, and no fact is saved.
   assert.equal(r3.status, 0, r3.stderr);

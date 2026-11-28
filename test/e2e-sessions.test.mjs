@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -106,7 +107,7 @@ writeSession(I, '2026-11-02T09:00:00.000Z', [
 const settingsBefore = snapshot(claudeSettingsHome);
 
 const run = out => execFileSync('node', [cli, project, '--claude-settings-home', claudeSettingsHome, '--old-path', OLD,
-  '--out', out, '--no-open', '--no-save'], { encoding: 'utf8' });
+  '--out', out, '--no-open', '--ignore', 'none', '--no-save'], { encoding: 'utf8' });
 const firstOut = path.join(work, 'run-1');
 run(firstOut);
 const artifact = path.join(repo, 'out', 'e2e-sessions');
@@ -310,7 +311,7 @@ test('S16: the command writes nothing into the project or the settings home', ()
 
 test('S17: two runs give the same report', () => {
   assert.equal(readFileSync(path.join(firstOut, 'report.json'), 'utf8'), json);
-  assert.equal(readFileSync(path.join(firstOut, 'report.html'), 'utf8'), html);
+  assert.equal(withoutRunFolders(readFileSync(path.join(firstOut, 'report.html'), 'utf8')), withoutRunFolders(html));
 });
 
 test('S22: the page has one Sessions row per session, newest first', () => {

@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -126,7 +127,7 @@ const checkCalls = list => list.filter(call => head(call).startsWith('context-he
 const sessionOf = call => head(call).split(' ').at(-1);
 
 function run({ out, cache = cacheA, intents = true }) {
-  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--no-save'];
+  const args = [cli, project, '--claude-settings-home', settings, '--old-path', OLD, '--out', out, '--cache', cache, '--no-open', '--verbose', '--ignore', 'none', '--no-save'];
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
   const json = existsSync(path.join(out, 'report.json')) ? readFileSync(path.join(out, 'report.json'), 'utf8') : null;
@@ -355,7 +356,7 @@ test('N20: a second run uses the cache and gives the same report', () => {
   assert.deepEqual(checkCalls(r2Calls).map(sessionOf), [N3, N3]);
   assert.equal(r2Calls.length, 2, 'no intents call either');
   assert.equal(r2.json, r1.json);
-  assert.equal(r2.html, r1.html);
+  assert.equal(withoutRunFolders(r2.html), withoutRunFolders(r1.html));
 });
 
 test('N22: the page shows the needs', () => {

@@ -32,7 +32,7 @@ const AMP = 'guides/r&d.md';
 const DEPLOY = 'guides/deploy.md';
 const SKILL = '.claude/skills/geo-audit/SKILL.md';
 const KEYS = ['find', 'close', 'told', 'lean'];
-const STATE = { 'not-proven': 'Score not proven', thin: 'Not enough data', 'no-data': 'No data' };
+const STATE = { 'not-proven': 'Score not proven', 'no-data': 'No data' };
 
 const write = (file, text) => { mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, text); };
 const append = (file, text) => writeFileSync(file, `${readFileSync(file, 'utf8')}${text}`);
@@ -161,7 +161,7 @@ answer(`${ID(6)}.needs-check.json`, { checks: [check('c1', 'rule'), check('c2', 
 const artifact = path.join(repo, 'out', 'e2e-step-12-b');
 function run(name, home, out = path.join(work, 'out', name)) {
   mkdirSync(out, { recursive: true });
-  const args = [cli, M, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--no-save', '--config', CONFIG, '--old-path', OLD, '--intents'];
+  const args = [cli, M, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--ignore', 'none', '--no-save', '--config', CONFIG, '--old-path', OLD, '--intents'];
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake } });
   assert.equal(result.status, 0, `${name}: ${result.stderr}`);
   const json = readFileSync(path.join(out, 'report.json'), 'utf8');
@@ -179,13 +179,13 @@ function variant(name, change) {
 const proofOf = (v1, status, text) => ({ ...(v1.proof || {}), status, text });
 const score = variant('score', r => {
   const v1 = r.health.v1;
-  Object.assign(v1, { shown: 'score', reason: null, headline: `${v1.score} ${v1.label} (method v1)`,
+  Object.assign(v1, { shown: 'score', reason: null, headline: `${v1.score} ${v1.label} (method v3)`,
     proof: proofOf(v1, 'pass', 'Set by the test: the agent searched for less of the Served needs than of the other needs.') });
 });
 const notProven = variant('not-proven', r => {
   const v1 = r.health.v1;
   const reason = 'Set by the test: the proof has 6 Served needs, and it needs 10 or more.';
-  Object.assign(v1, { shown: 'not-proven', reason, headline: `Score not proven (method v1). ${reason}`, proof: proofOf(v1, 'not-enough', 'Set by the test: 6 Served needs, 12 other needs.') });
+  Object.assign(v1, { shown: 'not-proven', reason, headline: `Score not proven (method v3). ${reason}`, proof: proofOf(v1, 'not-enough', 'Set by the test: 6 Served needs, 12 other needs.') });
 });
 // G12: a report of an older version: no `health.v1`, and no `question` on a fix.
 const noV1 = variant('no-v1', r => {
@@ -217,7 +217,7 @@ const rowsOf = page => sectionOf(page, 'health').split('<div class="qrow" ').sli
   const detail = part.slice(head[0].length);
   return { key: head[1], n: Number(head[2]), expanded: head[3], controls: head[4], button: head[5], id: head[6], hidden: Boolean(head[7]), detail, all: part,
     items: [...detail.matchAll(/<li class="hi[^"]*" data-item="([^"]*)">([\s\S]*?)<\/li>/g)].map(match => ({ kind: match[1], html: match[2], text: textOf(match[2]) })),
-    fixes: [...detail.matchAll(/<li data-fix="([^"]+)" data-kind="([^"]+)">([\s\S]*?)<\/li>/g)].map(match => ({ id: match[1], kind: match[2], text: textOf(match[3]) })) };
+    fixes: [...detail.matchAll(/href="#finding-([^"]+)"/g)].map(match => match[1]) };
 });
 const fixIds = html => [...html.matchAll(/<li data-fix="([^"]+)"/g)].map(match => match[1]);
 const pageDataOf = page => JSON.parse(page.match(/<script type="application\/json" id="page-data">([\s\S]*?)<\/script>/)[1]);
@@ -246,31 +246,33 @@ test('the runs give each state of the page', () => {
 test('G1, R2: with a score, the number area shows the number, the word, the method and the base', () => {
   const v1 = score.report.health.v1;
   const area = numberArea(score.html);
-  assert.ok(score.html.includes('<section class="health" id="health" data-shown="score" data-method="v1"'));
+  assert.ok(score.html.includes('<section class="health" id="health" data-shown="score" data-method="v3"'));
   assert.deepEqual(classText(area, 'hscore'), [String(v1.score)]);
   assert.deepEqual(classText(area, 'hlabel'), [v1.label]);
-  assert.deepEqual(classText(area, 'hmethod'), ['method v1']);
+  assert.deepEqual(classText(area, 'hmethod'), ['method v3']);
   assert.deepEqual(classText(area, 'hbase'), [v1.base.text]);
   assert.ok(!area.includes('class="hstate"') && !area.includes('class="hreason"'));
   // The real pages too: the state on the page is the state of report.json, and the method is there.
   for (const page of [main, thin, noData]) {
-    assert.ok(page.html.includes(`<section class="health" id="health" data-shown="${page.report.health.v1.shown}" data-method="v1"`), page.name);
-    assert.deepEqual(classText(numberArea(page.html), 'hmethod'), ['method v1'], page.name);
+    assert.ok(page.html.includes(`<section class="health" id="health" data-shown="${page.report.health.v1.shown}" data-method="v3"`), page.name);
+    assert.deepEqual(classText(numberArea(page.html), 'hmethod'), ['method v3'], page.name);
     assert.deepEqual(classText(numberArea(page.html), 'hbase'), [page.report.health.v1.base.text], page.name);
   }
 });
 
-test('G2: with no proof or thin data, the number area shows the number and a note with the state and the reason; with no data, the state and no number', () => {
+test('G2: provisional and no-data states show the reason instead of a number as the headline', () => {
   for (const page of [notProven, thin, noData, ...(V.shown === 'score' ? [] : [main])]) {
     const v1 = page.report.health.v1;
     const area = numberArea(page.html);
     assert.ok(v1.reason, `${page.name}: report.json has a reason`);
     if (typeof v1.score === 'number') {
-      // The user asked for the number in each state. The state and the reason are a note under it.
-      assert.deepEqual(classText(area, 'hscore'), [String(v1.score)], page.name);
-      assert.ok(!area.includes('class="hstate"'), page.name);
-      assert.ok(area.includes(`data-note="${v1.shown}"`), page.name);
-      assert.ok(area.includes(STATE[v1.shown]), page.name);
+      const title = v1.shown === 'thin'
+        ? `Early findings from ${v1.base.analysed} session${v1.base.analysed === 1 ? '' : 's'}`
+        : STATE[v1.shown];
+      assert.deepEqual(classText(area, 'hstate'), [title], page.name);
+      assert.deepEqual(classText(area, 'hreason'), [shownText(v1.reason)], page.name);
+      assert.doesNotMatch(area, /class="hscore"/, page.name);
+      assert.match(area, new RegExp(`id="about"[^>]*><summary>[^<]*</summary>\\s*<p class="hmeta">Provisional estimate: ${v1.score}/100</p>`), page.name);
     } else {
       assert.equal(v1.shown, 'no-data', page.name);
       assert.deepEqual(classText(area, 'hstate'), [STATE[v1.shown]], page.name);
@@ -313,23 +315,20 @@ test('G3, G4, G5: the 4 questions are there in each state, in order, closed, eac
   for (const page of [notProven, thin]) assert.ok(rowsOf(page.html).some(row => row.items.length > 0), page.name);
 });
 
-test('G6, X1 on the page: each fix is one time under its question, and the smaller fixes are in one closed part', () => {
+test('G6, X1 on the page: questions link to the ranked fixes, and smaller fixes are closed', () => {
   for (const fix of [...R.fixes.list, ...R.fixes.smaller]) assert.ok(['find', 'close', 'told'].includes(fix.question), `fix ${fix.id} has a question in report.json`);
   for (const page of pages) {
     const fixes = page.report.fixes;
     const rows = rowsOf(page.html);
     for (const row of rows) {
       const want = fixes.list.filter(fix => questionOf(fix) === row.key);
-      assert.deepEqual(row.fixes.map(fix => [fix.id, fix.kind]), want.map(fix => [fix.id, fix.kind]), `${page.name} ${row.key}`);
-      for (const [k, fix] of want.entries()) assert.ok(row.fixes[k].text.includes(shownText(fix.text)), `${page.name}: the text of ${fix.id}`);
-      // The fixes come after the items.
-      if (want.length && row.items.length) assert.ok(row.detail.indexOf('data-fix=') > row.detail.lastIndexOf('data-item='), `${page.name} ${row.key}`);
+      assert.deepEqual(row.fixes, want.map(fix => fix.id), `${page.name} ${row.key}`);
     }
     assert.deepEqual(rows.find(row => row.key === 'lean').fixes, [], page.name);
     const part = sectionOf(page.html, 'fixes');
     assert.ok(part.startsWith(`<section class="fixes" id="fixes" data-fixes="${fixes.list.length}" data-smaller="${fixes.smaller.length}"`), page.name);
-    assert.ok(page.html.indexOf('<section class="fixes"') > page.html.indexOf('<div class="hqs">'), `${page.name}: below the questions`);
-    assert.deepEqual(fixIds(part), fixes.smaller.map(fix => fix.id), page.name);
+    assert.deepEqual(fixIds(part), [...fixes.list, ...fixes.smaller].map(fix => fix.id), page.name);
+    assert.deepEqual(fixIds(part.split('<details class="hother"')[0]), fixes.list.slice(0, 1).map(fix => fix.id), page.name);
     assert.equal(part.includes('<details class="hother" id="fix-smaller">'), fixes.smaller.length > 0, page.name);
     assert.ok(!/<details[^>]* open/.test(page.html), `${page.name}: each details part is closed`);
     assert.equal(part.includes('<p class="nofix">No fix from this data.</p>'), fixes.list.length + fixes.smaller.length === 0, page.name);
@@ -341,8 +340,8 @@ test('G6, X1 on the page: each fix is one time under its question, and the small
   const moved = variant('smaller', r => { r.fixes.smaller = r.fixes.list.splice(-2); });
   const part = sectionOf(moved.html, 'fixes');
   assert.ok(part.includes('<details class="hother" id="fix-smaller"><summary>2 smaller items</summary>'));
-  assert.deepEqual(fixIds(part), moved.report.fixes.smaller.map(fix => fix.id));
-  assert.deepEqual(rowsOf(moved.html).flatMap(row => row.fixes.map(fix => fix.id)).sort(), moved.report.fixes.list.map(fix => fix.id).sort());
+  assert.deepEqual(fixIds(part), [...moved.report.fixes.list, ...moved.report.fixes.smaller].map(fix => fix.id));
+  assert.deepEqual(rowsOf(moved.html).flatMap(row => row.fixes).sort(), moved.report.fixes.list.map(fix => fix.id).sort());
 });
 
 test('G7: question told shows each typed rule, says where a saved rule is, and shows no task fact', () => {
@@ -392,7 +391,7 @@ test('G10: no en dash, no em dash, no network, and each text is escaped', () => 
   const evil = '<img src=x onerror=alert(1)> \u2013 \u2014 "q" & `<b>code</b>`';
   const hostile = variant('hostile', r => {
     const v1 = r.health.v1;
-    Object.assign(v1, { reason: evil, label: evil, method: 'v1', shown: 'not-proven' });
+    Object.assign(v1, { reason: evil, label: evil, method: 'v3', shown: 'not-proven' });
     v1.base.text = evil;
     v1.rules = evil;
     for (const q of v1.questions) { q.title = evil; q.answer = evil; q.lines = [evil]; q.items = [{ label: evil, count: evil, text: evil, path: null, kind: evil }]; }
@@ -423,9 +422,9 @@ test('G11: the 5 rows of step 11 are gone, and health.counts stays in report.jso
 });
 
 test('G12: a report with no health.v1 or with no data does not crash the page', () => {
-  assert.ok(noV1.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v1"'));
+  assert.ok(noV1.html.includes('<section class="health" id="health" data-shown="no-data" data-method="v3"'));
   assert.deepEqual(classText(numberArea(noV1.html), 'hstate'), ['No data']);
-  assert.deepEqual(classText(numberArea(noV1.html), 'hreason'), ['This report has no v1 score.']);
+  assert.deepEqual(classText(numberArea(noV1.html), 'hreason'), ['There is no score in this report.']);
   assert.ok(!numberArea(noV1.html).includes('class="hscore"'));
   // A fix with no question goes under "find".
   assert.deepEqual(rowsOf(noV1.html).map(row => row.fixes.length), [noV1.report.fixes.list.length, 0, 0, 0]);

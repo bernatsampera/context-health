@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -170,7 +171,7 @@ writeFileSync(log, '');
 const cacheA = path.join(work, 'cache-a');
 
 function run({ out, cache = cacheA, intents = true, extra = [], oldPath = true }) {
-  const args = [cli, project, '--claude-settings-home', settings, '--out', out, '--cache', cache, '--no-open', '--no-save', ...extra];
+  const args = [cli, project, '--claude-settings-home', settings, '--out', out, '--cache', cache, '--no-open', '--ignore', 'none', '--no-save', ...extra];
   if (oldPath) args.push('--old-path', OLD);
   if (intents) args.push('--intents');
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
@@ -202,7 +203,7 @@ test('X17: score is the last key, sessions and intents keep the order of the ear
   assert.equal(Object.keys(r1.report).at(-1), 'score');
   // Step 8 adds groups, routes and prompt between needs and score. Step 9 adds duplicates and health.
   // Step 11 adds fixes between health and prompt.
-  assert.deepEqual(Object.keys(r1.report).slice(-8), ['needs', 'groups', 'duplicates', 'routes', 'health', 'fixes', 'prompt', 'score']);
+  assert.deepEqual(Object.keys(r1.report).slice(-9), ['needs', 'groups', 'duplicates', 'analysis', 'routes', 'health', 'fixes', 'prompt', 'score']);
   assert.deepEqual(Object.keys(sc), ['method', 'labels', 'project', 'fixFirst', 'sessions']);
   assert.equal(sc.method, 'Score = average of Found, Cheap and No missing, 0 to 100.');
   assert.deepEqual(sc.labels, { good: 75, mixed: 50 });
@@ -416,9 +417,9 @@ test('X13, X15, X16: words, details and numbers agree; two runs give the same ou
       for (const value of [item.score, ...parts]) assert.ok(whole(value) && value >= 0 && value <= 100, where);
     }
   }
-  assert.equal(r2.status, 0, r2.stderr);
+  assert.equal(r2.status, 2, `Only the failed checks needed another call: ${r2.stderr}`);
   assert.equal(r2.json, r1.json);
-  assert.equal(r2.html, r1.html);
+  assert.equal(withoutRunFolders(r2.html), withoutRunFolders(r1.html));
 });
 
 test('X18: the step 8 page does not show the score, and shows the same sessions and needs', () => {
@@ -438,9 +439,11 @@ test('X18: the step 8 page does not show the score, and shows the same sessions 
   const skill = row(C).files.find(file => file.path === '.claude/skills/city-batch/SKILL.md');
   assert.deepEqual(skill.routes[0].route, [{ path: '.claude/skills/city-batch/SKILL.md', how: 'trigger' }]);
   assert.equal(row(C).files.find(file => file.path === 'frontend/CLAUDE.md').routes[0].route.at(-1).how, 'map');
-  // X20: a gone file is not on the page. S7 has one intent whose only need is gone: no file, no problem.
+  // Historical opens survive even when the current map and score no longer include those files.
   assert.deepEqual([row(S7).intentCount, row(S7).files, row(S7).problems], [1, [], []]);
-  assert.ok(!r1.html.includes(GONE) && !r1.html.includes(GONE2));
+  assert.ok(!data.map.nodes.some(node => node.id === GONE || node.id === GONE2));
+  assert.ok(row(S1).exploration.opened.includes(GONE));
+  assert.ok(row(S7).exploration.opened.includes(GONE2));
   assert.ok(r3.html.includes('data-state="not-analysed"'));
   assert.ok(r5.html.includes('data-state="no-sessions"'));
   console.log(`Artifact: ${path.join(artifact, 'report.html')}`);

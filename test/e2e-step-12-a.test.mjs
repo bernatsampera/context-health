@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -258,13 +259,14 @@ writeFileSync(log, '');
 const artifact = path.join(repo, 'out', 'e2e-step-12-a');
 const cacheOf = name => path.join(work, 'cache', name);
 const all = [];
-function run(name, project, home, { cache = name, out = null } = {}) {
+function run(name, project, home, { cache = name, out = null, exit = 0 } = {}) {
   const dir = out || path.join(work, 'out', name);
-  const args = [cli, project, '--claude-settings-home', home, '--out', dir, '--cache', cacheOf(cache), '--no-open', '--no-save', '--old-path', OLD, '--sessions', '40', '--intents'];
+  const args = [cli, project, '--claude-settings-home', home, '--out', dir, '--cache', cacheOf(cache), '--no-open', '--ignore', 'none', '--no-save', '--old-path', OLD, '--sessions', '40', '--intents'];
   const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
-  assert.equal(result.status, 0, `${name}: ${result.stderr}`);
   const json = readFileSync(path.join(dir, 'report.json'), 'utf8');
-  const item = { name, stdout: result.stdout, json, report: JSON.parse(json), v1: JSON.parse(json).health.v1 };
+  const report = JSON.parse(json);
+  assertReportExit(result, report, exit);
+  const item = { name, stdout: result.stdout, json, report, v1: report.health.v1 };
   all.push(item);
   return item;
 }
@@ -290,14 +292,14 @@ const main = run('main', R2.dir, HM);
 const historyDir = path.join(cacheOf('main'), 'history');
 const historyBefore = tree(historyDir);
 // The same cache again (R1, P11), then a new cache.
-const again = run('main-again', R2.dir, HM, { cache: 'main', out: artifact });
+const again = run('main-again', R2.dir, HM, { cache: 'main', out: artifact, exit: 2 });
 const fresh = run('main-fresh', R2.dir, HM);
 const first = run('first', R1.dir, HM);
 const plain = run('plain', PLAIN, HM);
 const thin = run('thin', R2.dir, HT);
 const few = run('few', R2.dir, HF);
 const fail = run('fail', R2.dir, HX);
-const empty = run('empty', R2.dir, HE);
+const empty = run('empty', R2.dir, HE, { exit: 2 });
 const p3999 = run('p3999', P3999, HP);
 const p4000 = run('p4000', P4000, HP);
 const p30000 = run('p30000', P30000, HP);
@@ -331,13 +333,14 @@ const startItem = (v1, rel, what) => v1.penalty.items.find(item => item.path ===
 // skill deploy ("deploy: Deploy the demo.", 24 characters = 6 tokens) = 5,006 tokens. Penalty = floor((5,006 - 3,000) / 1,000) = 2.
 // score = round(78.57 - 2) = 77, mixed.
 test('S1 to S8, S13, S18, R2: the grades and the score of the main run', () => {
-  assert.equal(V.method, 'v1');
+  assert.equal(V.method, 'v3');
   assert.ok(V.rules.length > 100 && !/[\u2013\u2014]/.test(JSON.stringify(V)), 'the rules are there, and no text has a dash');
-  assert.deepEqual(V.grades, { served: 31, slow: 4, missed: 7, total: 42 });
-  assert.equal(V.grades.served + V.grades.slow + V.grades.missed, V.grades.total);
-  // S3: a Slow need counts 0.5. S13: a whole number from 0 to 100.
-  assert.equal(V.raw, 78.6);
-  assert.equal(V.score, 77);
+  // Method v3: c in s9 and in s14 has no route, and a grep gave it. c in s5 and s16, and the rules O, M and M, stay Missed.
+  assert.deepEqual(V.grades, { served: 31, slow: 4, searched: 2, missed: 5, total: 42 });
+  assert.equal(V.grades.served + V.grades.slow + V.grades.searched + V.grades.missed, V.grades.total);
+  // S3: a Slow and a Searched need count 0.5: 100 x (31 + 2 + 1) / 42. S13: a whole number from 0 to 100.
+  assert.equal(V.raw, 81);
+  assert.equal(V.score, 79);
   assert.equal(V.label, 'mixed');
   assert.deepEqual(V.base, { analysed: 17, total: 17, needs: 42, text: 'from 17 of 17 sessions, 42 needs' });
   // S5: the read of tests/t.md is a dropped read, not a need.
@@ -425,21 +428,21 @@ test('S9, S13, S15: the penalty edges, the clamp, and thin data', () => {
     assert.equal(item.v1.shown, 'thin', item.name);
     assert.ok(Number.isInteger(item.v1.score) && item.v1.score >= 0 && item.v1.score <= 100, item.name);
   }
-  assert.deepEqual(p30000.v1.grades, { served: 0, slow: 0, missed: 1, total: 1 });
-  // S15: 2 sessions and 4 needs (3 Served, c Missed). raw 75. Unused: docs/extra.md 5,000, the 2 skill descriptions 6 + 6,
-  // docs/rules.md (42 characters = 11 tokens) = 5,023 tokens, 2 points. The score 73 stays in report.json, and no number shows.
-  assert.deepEqual(thin.v1.grades, { served: 3, slow: 0, missed: 1, total: 4 });
-  assert.deepEqual([thin.v1.penalty.unusedTokens, thin.v1.penalty.points, thin.v1.score, thin.v1.shown], [5023, 2, 73, 'thin']);
+  assert.deepEqual(p30000.v1.grades, { served: 0, slow: 0, searched: 0, missed: 1, total: 1 });
+  // S15: 2 sessions and 4 needs (3 Served, c Searched). raw 87.5. Unused: docs/extra.md 5,000, the 2 skill descriptions 6 + 6,
+  // docs/rules.md (42 characters = 11 tokens) = 5,023 tokens, 2 points. The score 86 (85.5) stays in report.json, and no number shows.
+  assert.deepEqual(thin.v1.grades, { served: 3, slow: 0, searched: 1, missed: 0, total: 4 });
+  assert.deepEqual([thin.v1.penalty.unusedTokens, thin.v1.penalty.points, thin.v1.score, thin.v1.shown], [5023, 2, 86, 'thin']);
   assert.equal(thin.v1.reason, 'Only 2 analysed sessions and 4 needs (5 sessions and 20 needs are necessary).');
-  assert.equal(thin.v1.headline, `Not enough data (method v1). ${thin.v1.reason}`);
-  assert.match(thin.stdout, /^score v1: Not enough data \(method v1\)\. /m);
+  assert.equal(thin.v1.headline, `Early findings from 2 sessions (method v3). ${thin.v1.reason}`);
+  assert.match(thin.stdout, /^Health: Early findings from 2 sessions \(method v3\)\. /m);
 });
 
 test('S14: no session gives no score, with a reason', () => {
   const v1 = empty.v1;
   assert.deepEqual([v1.score, v1.label, v1.raw, v1.shown], [null, null, null, 'no-data']);
   assert.equal(v1.reason, 'The tool found no session of this project.');
-  assert.equal(v1.headline, `No data (method v1). ${v1.reason}`);
+  assert.equal(v1.headline, `No data (method v3). ${v1.reason}`);
   assert.deepEqual(v1.questions.map(item => [item.key, item.answer, item.n]), [['find', null, 0], ['close', null, 0], ['told', null, 0], ['lean', null, 0]]);
   assert.equal(v1.proof.status, 'no-data');
 });
@@ -461,12 +464,13 @@ test('S16: the score, the parts and the counts of steps 9 and 11 stay, and they 
 // folder link, no late.md and no extra.md):
 // - Served 17: s0 1, s1 3, s2 3, s3 2, s7 3, s8 2, s11 1, s12 1, s15 1.
 // - Slow 10: p in s3, the 3 guides of s4, g3 in s9, p and q in s11, q in s12, g1 in s13, p in s14.
-// - Missed 14: s5 3, s6 3 (a, b and the rule R), c in s9, s10 2, M in s12, a and b in s13, c in s14, c in s16.
-// - 41 needs: docs/new/late.md is not on disk, so its read is gone. raw = 100 x (17 + 5) / 41 = 53.66.
-// - Unused: the description of deploy, 6 tokens: 0 points. Score 54. Commit 2 gives 77.
+// - Searched 4: a and b in s6, c in s9, c in s14 (a grep gave each). Method v3.
+// - Missed 10: s5 3, the rule R in s6, s10 2, M in s12, a and b in s13, c in s16.
+// - 41 needs: docs/new/late.md is not on disk, so its read is gone. raw = 100 x (17 + 5 + 2) / 41 = 58.54.
+// - Unused: the description of deploy, 6 tokens: 0 points. Score 59. Commit 2 gives 79.
 test('S17: the context fix of commit 2 moves the score on the same sessions', () => {
-  assert.deepEqual(first.v1.grades, { served: 17, slow: 10, missed: 14, total: 41 });
-  assert.deepEqual([first.v1.raw, first.v1.penalty.points, first.v1.score], [53.7, 0, 54]);
+  assert.deepEqual(first.v1.grades, { served: 17, slow: 10, searched: 4, missed: 10, total: 41 });
+  assert.deepEqual([first.v1.raw, first.v1.penalty.points, first.v1.score], [58.5, 0, 59]);
   assert.ok(V.score > first.v1.score);
 });
 
@@ -506,7 +510,7 @@ test('P1, P3, P5, P6, P10, P12, P13: the proof of the main run uses the map of t
   // P10: the note about the files that are not in git.
   assert.equal(proof.notes[0], 'Memory files and the files of ~/.claude are not in git. The proof uses their state of today.');
   // The page shows the number.
-  assert.deepEqual([V.shown, V.reason, V.headline], ['score', null, '77 mixed (method v1)']);
+  assert.deepEqual([V.shown, V.reason, V.headline], ['score', null, '79 mixed (method v3)']);
 });
 
 test('P4, P14: a project with no git gives the same score, and the score is not proven', () => {
@@ -524,7 +528,7 @@ test('P4, P14: a project with no git gives the same score, and the score is not 
   assert.deepEqual(rest, mainRest);
   assert.equal(v1.shown, 'not-proven');
   assert.ok(v1.reason.startsWith('The project is not a git repository'));
-  assert.equal(v1.headline, `Score not proven (method v1). ${v1.reason}`);
+  assert.equal(v1.headline, `Score not proven (method v3). ${v1.reason}`);
 });
 
 // 5 sessions, each with n1, n2, n3 and the index: 20 Served needs on the map of commit 1, and no other need.
@@ -537,7 +541,7 @@ test('P7, P9: not enough needs for the proof gives "not-enough", with the number
   assert.deepEqual([v1.proof.grades.served.needs, v1.proof.grades.other.needs, v1.proof.grades.other.searchRate, v1.proof.grades.missed.typedFactRate], [20, 0, null, null]);
   assert.equal(v1.reason, '5 sessions with a commit give 20 Served needs and 0 Slow and Missed needs (10 of each are necessary).');
   assert.equal(v1.proof.text, `Score not proven: ${v1.reason}`);
-  assert.equal(v1.headline, `Score not proven (method v1). ${v1.reason}`);
+  assert.equal(v1.headline, `Score not proven (method v3). ${v1.reason}`);
 });
 
 // On the map of commit 1: Served 17 (12 searched near notes, and the index 5 times): 12 / 17 = 0.706.
@@ -581,17 +585,17 @@ test('P11: the old files go only into <cache>/history/<commit>/, and a second ru
 });
 
 test('S19, R1, R2: the command prints the v1 line, and each run of the same input gives the same report.json', () => {
-  assert.match(main.stdout, /^score v1: 77 mixed \(method v1\)\. proof: pass, 16 of 17 sessions, 3 commits \(3 read from git\)$/m);
+  assert.match(main.stdout, /^Health: 79 mixed \(method v3\)\. proof: pass, 16 of 17 sessions, 3 commits \(3 read from git\)$/m);
   assert.equal(again.json, main.json, 'the same cache');
   assert.equal(fresh.json, main.json, 'a new cache');
   // No folder of the cache and no time of the run is in the report.
   for (const item of all) {
     assert.ok(!item.json.includes(path.join(work, 'cache')) && !item.json.includes('/history/'), item.name);
-    assert.equal(item.v1.method, 'v1', item.name);
-    assert.ok(item.v1.headline.includes('(method v1)'), item.name);
+    assert.equal(item.v1.method, 'v3', item.name);
+    assert.ok(item.v1.headline.includes('(method v3)'), item.name);
     assert.deepEqual(Object.keys(item.v1), ['method', 'rules', 'score', 'label', 'shown', 'reason', 'headline', 'base', 'grades', 'raw', 'penalty', 'questions', 'facts', 'proof'], item.name);
     assert.deepEqual(Object.keys(item.v1.proof), ['status', 'text', 'limits', 'compare', 'sessions', 'grades', 'checks', 'factsLeftOut', 'commits', 'notes'], item.name);
-    assert.equal(item.v1.grades.served + item.v1.grades.slow + item.v1.grades.missed, item.v1.grades.total, item.name);
+    assert.equal(item.v1.grades.served + item.v1.grades.slow + item.v1.grades.searched + item.v1.grades.missed, item.v1.grades.total, item.name);
     assert.equal(item.v1.questions.length, 4, item.name);
   }
 });

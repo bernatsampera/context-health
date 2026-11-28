@@ -27,6 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit } from './report-html.mjs';
 import { CONFIG, applyPatch, betterPatches, parseArgs, run } from '../fixtures/context-ab/apply.mjs';
 import { compare, summarize } from '../fixtures/context-ab/compare.mjs';
 import { build } from '../fixtures/context-ab/ab.mjs';
@@ -154,15 +155,17 @@ const cli = path.join(repo, 'bin', 'context-health.mjs');
 const fake = path.join(repo, 'test', 'fake-claude.mjs');
 // A run of the command on a project copy of apply.mjs, with its own cache and call log.
 // Step 11: with the config file of the A/B runs (see apply.mjs), so second-iteration/direction.md stays a context file.
-function direct({ project, cache, intents, log, name, config = CONFIG }) {
+function direct({ project, cache, intents, log, name, config = CONFIG, exit = 0 }) {
   const out = path.join(artifact, 'direct', name);
   const args = [cli, project, '--claude-settings-home', path.join(ab, 'claude-home'), '--old-path', '/Users/example/projects/indoeuromap',
-    '--cache', cache, '--out', out, '--no-open', '--no-save'];
+    '--cache', cache, '--out', out, '--no-open', '--ignore', 'none', '--no-save'];
   if (config) args.push('--config', config);
   if (intents) args.push('--intents');
   const result = spawnSync(process.execPath, args, { encoding: 'utf8', env: { ...process.env, CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
-  assert.equal(result.status, 0, result.stderr);
-  return { json: readFileSync(path.join(out, 'report.json'), 'utf8'), report: JSON.parse(readFileSync(path.join(out, 'report.json'), 'utf8')) };
+  const json = readFileSync(path.join(out, 'report.json'), 'utf8');
+  const report = JSON.parse(json);
+  assertReportExit(result, report, exit);
+  return { json, report };
 }
 const dupCalls = log => (existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line))
   .filter(call => call.stdin.startsWith('context-health duplicates ')) : []);
@@ -283,7 +286,7 @@ test('D5, D6: the cache, and a model answer that names a file that is not in the
   const stdin = dupCalls(log)[0].stdin;
   assert.ok(stdin.includes('\n### FILE AGENTS.md\n'));
   assert.ok(!stdin.includes('City profiles must show the top 8 origin groups'), 'no user message of session 99000001');
-  const r2 = direct({ project, cache, intents: true, log, name: 'cache-2' });
+  const r2 = direct({ project, cache, intents: true, log, name: 'cache-2', exit: 2 });
   assert.equal(dupCalls(log).length, 1, 'D5: no second call');
   assert.equal(JSON.stringify(r2.report.duplicates), JSON.stringify(r1.report.duplicates));
   // D6: one more file gives another run id. Its fake answer names docs/does-not-exist.md: a bad answer, tried 2 times.
@@ -294,7 +297,7 @@ test('D5, D6: the cache, and a model answer that names a file that is not in the
   // passes a config file that also includes notes/, so the file is a context file as before.
   const extraConfig = path.join(mkdtempSync(path.join(os.tmpdir(), 'context-ab-config-')), 'context-files.json');
   writeFileSync(extraConfig, `${JSON.stringify({ include: [...JSON.parse(readFileSync(CONFIG, 'utf8')).include, 'notes/**'] }, null, 2)}\n`);
-  const r3 = direct({ project, cache, intents: true, log, name: 'unknown-path', config: extraConfig });
+  const r3 = direct({ project, cache, intents: true, log, name: 'unknown-path', config: extraConfig, exit: 2 });
   assert.equal(dupCalls(log).length, 3);
   assert.equal(r3.report.duplicates.check.status, 'failed');
   assert.match(r3.report.duplicates.check.reason, /unknown file "docs\/does-not-exist\.md"/);
@@ -404,7 +407,7 @@ test('AB14: each planted fix raises the v1 score on the same 6 sessions, or keep
   // The grades come from the map of each version. The 19 needs are the same in each version.
   for (const [name, report] of Object.entries(versions)) {
     const v = report.health.v1;
-    assert.equal(v.method, 'v1');
+    assert.equal(v.method, 'v3');
     assert.equal(v.grades.total, 19, name);
     assert.equal(v.grades.served + v.grades.slow + v.grades.missed, 19, name);
     assert.equal(v.score, Math.round(Math.max(0, Math.min(100, 100 * (v.grades.served + 0.5 * v.grades.slow) / 19 - v.penalty.points))), name);
@@ -443,14 +446,14 @@ test('AB15, AB16: a new context file that no intent used changes the v1 score by
   const log = path.join(artifact, 'direct', 'calls-v1.jsonl');
   writeFileSync(log, '');
   const first = direct({ project, cache, intents: true, log, name: 'v1-first' }).report.health.v1;
-  const second = direct({ project, cache, intents: true, log, name: 'v1-second' }).report.health.v1;
+  const second = direct({ project, cache, intents: true, log, name: 'v1-second', exit: 2 }).report.health.v1;
   assert.deepEqual(second, first);
   assert.deepEqual(first, bad.health.v1);
   // A new file in a docs folder is a context file by the rule of step 11. No intent read it, and no file links it.
   mkdirSync(path.join(project, 'docs'), { recursive: true });
   writeFileSync(path.join(project, 'docs', 'unused-note.md'), '# A note that no session used\n\nThe office plant gets water each Friday.\n');
   spawnSync('git', ['-C', project, 'add', '-A']);
-  const added = direct({ project, cache, intents: true, log, name: 'v1-unused-file' }).report;
+  const added = direct({ project, cache, intents: true, log, name: 'v1-unused-file', exit: 2 }).report;
   assert.ok(added.contextFiles.some(file => file.path === 'docs/unused-note.md'));
   assert.deepEqual([added.health.v1.score, added.health.v1.grades, added.health.v1.penalty.points],
     [first.score, first.grades, first.penalty.points]);
@@ -458,7 +461,7 @@ test('AB15, AB16: a new context file that no intent used changes the v1 score by
   // file, so its longer text is not a penalty.
   const claude = path.join(project, 'CLAUDE.md');
   writeFileSync(claude, `${readFileSync(claude, 'utf8')}\nThe office notes: [unused note](docs/unused-note.md).\n`);
-  const linked = direct({ project, cache, intents: true, log, name: 'v1-unused-file-linked' }).report;
+  const linked = direct({ project, cache, intents: true, log, name: 'v1-unused-file-linked', exit: 2 }).report;
   assert.deepEqual([linked.health.v1.score, linked.health.v1.grades, linked.health.v1.penalty.points],
     [first.score, first.grades, first.penalty.points]);
 });

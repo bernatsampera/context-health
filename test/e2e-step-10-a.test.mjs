@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertReportExit, withoutRunFolders } from './report-html.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(repo, 'bin', 'context-health.mjs');
@@ -373,19 +374,20 @@ const WORK_CONFIG = path.join(work, 'config', 'work.json');
 write(WORK_CONFIG, `${JSON.stringify({ include: ['work/**'] }, null, 2)}\n`);
 // One run of the real command. With `again`, a second run with the same cache: both reports must be the same.
 function run(name, root, { home = repoSettings, old = false, intents = false, again = false, out2 = null, config = null } = {}) {
-  const once = out => {
-    const args = [cli, root, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--no-save'];
+  const once = (out, exit = 0) => {
+    const args = [cli, root, '--claude-settings-home', home, '--out', out, '--cache', path.join(work, 'cache', name), '--no-open', '--ignore', 'none', '--no-save'];
     if (old) args.push('--old-path', OLD);
     if (intents) args.push('--intents');
     if (config) args.push('--config', config);
     const result = spawnSync('node', args, { encoding: 'utf8', env: { ...process.env, TZ: 'UTC', CONTEXT_HEALTH_CLAUDE_BIN: fake, CONTEXT_HEALTH_FAKE_LOG: log } });
-    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-    return { json: readFileSync(path.join(out, 'report.json'), 'utf8'), html: readFileSync(path.join(out, 'report.html'), 'utf8') };
+    const json = readFileSync(path.join(out, 'report.json'), 'utf8');
+    assertReportExit(result, JSON.parse(json), exit);
+    return { json, html: readFileSync(path.join(out, 'report.html'), 'utf8') };
   };
   const first = once(path.join(work, 'out', `${name}-1`));
   if (again) {
     if (out2) mkdirSync(out2, { recursive: true });
-    const second = once(out2 || path.join(work, 'out', `${name}-2`));
+    const second = once(out2 || path.join(work, 'out', `${name}-2`), name === 'main' ? 2 : 0);
     twice.push({ name, first, second });
   }
   return { ...first, report: JSON.parse(first.json) };
@@ -1009,7 +1011,7 @@ test('G1: two runs give the same report and the same page', () => {
   assert.deepEqual(twice.map(item => item.name), ['main', 'off', 'noclaude', 'noclaude-claude-md', 'bare', 'nogit']);
   for (const { name, first, second } of twice) {
     assert.equal(first.json, second.json, `${name}: report.json`);
-    assert.equal(first.html, second.html, `${name}: report.html`);
+    assert.equal(withoutRunFolders(first.html), withoutRunFolders(second.html), `${name}: report.html`);
   }
 });
 
@@ -1028,7 +1030,7 @@ test('G4: the key order of the report, with the 2 new keys of map', () => {
     // Step 11: the new key `contextRules` is after `contextFiles`.
     ['project', 'claudeSettingsHome', 'tokenMethod', 'listing', 'totals', 'startLoad', 'later', 'contextFiles', 'contextRules', 'map', 'sessions']);
   // Step 11: the new key `fixes` is after `health`.
-  assert.deepEqual(keys.slice(keys.indexOf('sessions') + 1), ['intents', 'needs', 'groups', 'duplicates', 'routes', 'health', 'fixes', 'prompt', 'score']);
+  assert.deepEqual(keys.slice(keys.indexOf('sessions') + 1), ['intents', 'needs', 'groups', 'duplicates', 'analysis', 'routes', 'health', 'fixes', 'prompt', 'score']);
   for (const item of [main, plain, noClaudeOff]) {
     assert.deepEqual(Object.keys(item.report.map), ['rules', 'totals', 'files', 'broken', 'folderMentions', 'virtualStart']);
     assert.deepEqual(Object.keys(item.report.map.totals), ['files', 'contextFiles', 'start', 'byPath', 'none', 'noneContext', 'brokenLinks', 'maxSteps', 'bySteps']);
